@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% load app_extras %}
+
+{% block title %}{{ database.name }}{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <div>
+        <span class="eyebrow">{{ database.get_use_case_display }}</span>
+        <h1>{{ database.name }}</h1>
+        <p>{{ database.description|default:"Lista creada para trabajar sin pelearte con la complejidad tecnica." }}</p>
+    </div>
+    <div class="hero-actions">
+        <a class="button" href="{% url 'record_create' database.slug %}">Nuevo registro</a>
+        <a class="button subtle" href="?tab={{ active_tab }}&mode={% if mode == 'basic' %}advanced{% else %}basic{% endif %}">
+            {% if mode == 'basic' %}Ver opciones avanzadas{% else %}Volver a modo simple{% endif %}
+        </a>
+        <a class="button subtle" href="{% url 'dashboard' %}">Volver</a>
+    </div>
+</section>
+
+<section class="tab-strip">
+    <a class="tab-link {% if active_tab == 'summary' %}is-current{% endif %}" href="?tab=summary">Resumen</a>
+    <a class="tab-link {% if active_tab == 'daily' %}is-current{% endif %}" href="?tab=daily">Trabajo diario</a>
+    <a class="tab-link {% if active_tab == 'records' %}is-current{% endif %}" href="?tab=records">Registros</a>
+    <a class="tab-link {% if active_tab == 'structure' %}is-current{% endif %}" href="?tab=structure">Estructura</a>
+    <a class="tab-link {% if active_tab == 'manage' %}is-current{% endif %}" href="?tab=manage">Gestion</a>
+</section>
+
+{% if active_tab == 'summary' %}
+    <section class="stats-grid">
+        <article class="stat-card"><strong>{{ stats.records }}</strong><span>Registros visibles</span></article>
+        <article class="stat-card"><strong>{{ stats.fields }}</strong><span>Campos definidos</span></article>
+        <article class="stat-card"><strong>{{ stats.relations }}</strong><span>Relaciones</span></article>
+    </section>
+
+    <section class="detail-grid">
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Estado de la base</h2>
+                <p>Resumen rapido para entender como esta armada y que puedes hacer ahora.</p>
+            </div>
+            <div class="record-meta">
+                <div class="record-meta-row"><span>Campos tipo seleccion</span><strong>{{ stats.selects }}</strong></div>
+                <div class="record-meta-row"><span>Prioridad alta</span><strong>{{ stats.high }}</strong></div>
+                <div class="record-meta-row"><span>Prioridad urgente</span><strong>{{ stats.urgent }}</strong></div>
+                <div class="record-meta-row"><span>Miembros</span><strong>{{ database.memberships.count }}</strong></div>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Acciones recomendadas</h2>
+                <p>Flujo sugerido para usuarios no tecnicos.</p>
+            </div>
+            <div class="stack-form compact">
+                <a class="database-card" href="?tab=records">
+                    <h3>Cargar o buscar registros</h3>
+                    <p>Entra a la vista operativa para filtrar, revisar y agregar informacion.</p>
+                </a>
+                <a class="database-card" href="?tab=structure">
+                    <h3>Ajustar campos y relaciones</h3>
+                    <p>Modifica la estructura de la base si necesitas sumar estados, listas o referencias.</p>
+                </a>
+                <a class="database-card" href="?tab=manage">
+                    <h3>Importar, exportar y compartir</h3>
+                    <p>Trae datos desde CSV, exporta la base o asigna roles a otras personas.</p>
+                </a>
+            </div>
+        </article>
+    </section>
+{% endif %}
+
+{% if active_tab == 'daily' %}
+    <section class="detail-grid">
+        <article class="panel">
+            <div class="panel-head split">
+                <div>
+                    <h2>Trabajo de hoy</h2>
+                    <p>Todo lo importante en un solo lugar para operar sin navegar menus.</p>
+                </div>
+                <a class="button" href="{% url 'record_create' database.slug %}">Carga rapida</a>
+            </div>
+            <div class="stack-form compact">
+                {% for record in daily_records %}
+                    <a class="database-card" href="{% url 'record_detail' database.slug record.pk %}">
+                        <div class="member-row">
+                            <strong>{{ record.title }}</strong>
+                            <span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span>
+                        </div>
+                        <p>Abre el elemento y continua desde donde lo dejaste.</p>
+                    </a>
+                {% empty %}
+                    <div class="empty-state">
+                        <h3>No hay urgencias por ahora</h3>
+                        <p>Puedes agregar un nuevo elemento o revisar toda la lista desde Registros.</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </article>
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Formulario simplificado</h2>
+                <p>Asi veras la carga principal en esta base.</p>
+            </div>
+            <div class="stack-form compact">
+                <div class="field">
+                    <span>Nombre principal</span>
+                    <input type="text" value="" placeholder="Ejemplo: Producto, alumno o cliente">
+                </div>
+                {% for field in basic_fields_preview %}
+                    <div class="field">
+                        <span>{{ field.label }}</span>
+                        <input type="text" value="" placeholder="{{ field.help_text|default:'Completa este dato' }}">
+                    </div>
+                {% empty %}
+                    <div class="empty-state">
+                        <h3>Primero arma la estructura</h3>
+                        <p>Agrega columnas en Estructura y aqui apareceran tus campos principales.</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+{% endif %}
+
+{% if active_tab == 'records' %}
+    <section class="panel">
+        <div class="panel-head split">
+            <div>
+                <h2>Buscar y operar elementos</h2>
+                <p>Esta vista se enfoca solo en encontrar, filtrar y agregar registros.</p>
+            </div>
+            <div class="hero-actions">
+                <a class="button" href="{% url 'record_create' database.slug %}">Agregar registro</a>
+            </div>
+        </div>
+        <div class="panel-head top-gap">
+            <h3>Vistas guardadas</h3>
+            <p>Reutiliza filtros frecuentes sin volver a armarlos.</p>
+        </div>
+        {% if import_summary %}
+            <div class="import-summary">
+                <div class="record-meta">
+                    <div class="record-meta-row"><span>Filas detectadas</span><strong>{{ import_summary.total_rows }}</strong></div>
+                    <div class="record-meta-row"><span>Filas importadas</span><strong>{{ import_summary.imported }}</strong></div>
+                    <div class="record-meta-row"><span>Filas omitidas</span><strong>{{ import_summary.skipped }}</strong></div>
+                </div>
+                {% if import_summary.errors %}
+                    <div class="tag-list">
+                        {% for item in import_summary.errors %}
+                            <span class="tag">{{ item }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        {% endif %}
+        <div class="tag-list">
+            {% for saved in saved_views %}
+                <a class="tag" href="?tab=records&saved_view={{ saved.pk }}">{{ saved.name }}</a>
+            {% empty %}
+                <span class="tag">Todavia no guardaste vistas</span>
+            {% endfor %}
+        </div>
+        <form method="get" class="toolbar">
+            <input type="hidden" name="tab" value="records">
+            <input type="hidden" name="mode" value="{{ mode }}">
+            <input type="text" name="q" value="{{ query }}" placeholder="Buscar por nombre o contenido...">
+            <select name="priority">
+                <option value="">Todas las prioridades</option>
+                {% for value, label in priority_choices %}
+                    <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="sort">
+                {% for value, label in sort_choices %}
+                    <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="view" value="{{ view_mode }}">
+            <button type="submit" class="button subtle">Aplicar</button>
+        </form>
+        <form method="post" action="{% url 'saved_view_create' database.slug %}" class="toolbar top-gap">
+            {% csrf_token %}
+            <input type="hidden" name="query" value="{{ query }}">
+            <input type="hidden" name="priority" value="{{ selected_priority }}">
+            <input type="hidden" name="sort" value="{{ sort }}">
+            <input type="hidden" name="view_mode" value="{{ view_mode }}">
+            {{ save_view_form.name }}
+            <button type="submit" class="button subtle">Guardar esta vista</button>
+        </form>
+        <div class="view-switch">
+            <a class="pill {% if view_mode == 'table' %}is-active{% endif %}" href="?tab=records&mode={{ mode }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view=table">Tabla</a>
+            <a class="pill {% if view_mode == 'cards' %}is-active{% endif %}" href="?tab=records&mode={{ mode }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view=cards">Tarjetas</a>
+        </div>
+        {% if view_mode == 'cards' %}
+            <div class="record-card-grid">
+                {% for record in records %}
+                    <article class="record-card">
+                        <div class="member-row">
+                            <h3><a href="{% url 'record_detail' database.slug record.pk %}">{{ record.title }}</a></h3>
+                            <span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span>
+                        </div>
+                        <div class="record-meta">
+                            {% for field in table_fields %}
+                                <div class="record-meta-row">
+                                    <span>{{ field.label }}</span>
+                                    <strong>{{ record|display_value:field|default:"-" }}</strong>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <div class="hero-actions">
+                            <a href="{% url 'record_edit' database.slug record.pk %}">Editar</a>
+                            <a href="{% url 'record_delete' database.slug record.pk %}">Eliminar</a>
+                        </div>
+                    </article>
+                {% empty %}
+                    <div class="empty-state">
+                        <h3>Todavia no hay registros cargados</h3>
+                        <p>Puedes crear uno manualmente o importar un CSV.</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Registro</th>
+                            <th>Prioridad</th>
+                            {% for field in table_fields %}
+                                <th>{{ field.label }}</th>
+                            {% endfor %}
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                            <tr>
+                                <td><a href="{% url 'record_detail' database.slug record.pk %}">{{ record.title }}</a></td>
+                                <td><span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span></td>
+                                {% for field in table_fields %}
+                                    <td>{{ record|display_value:field }}</td>
+                                {% endfor %}
+                                <td class="actions">
+                                    <a href="{% url 'record_edit' database.slug record.pk %}">Editar</a>
+                                    <a href="{% url 'record_delete' database.slug record.pk %}">Eliminar</a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="99">Todavia no hay registros cargados.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+        {% if page_obj.paginator.num_pages > 1 %}
+            <div class="pagination">
+                {% if page_obj.has_previous %}
+                    <a class="button subtle" href="?tab=records&mode={{ mode }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view={{ view_mode }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+                {% endif %}
+                <span class="pill is-active">Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a class="button subtle" href="?tab=records&mode={{ mode }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view={{ view_mode }}&page={{ page_obj.next_page_number }}">Siguiente</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </section>
+{% endif %}
+
+{% if active_tab == 'structure' %}
+    <section class="structure-shell">
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Mapa visual de la base</h2>
+                <p>Revisa rapidamente que tipos de campo tienes y donde hay listas o relaciones.</p>
+            </div>
+            <div class="structure-overview">
+                <article class="mini-stat">
+                    <strong>{{ stats.fields }}</strong>
+                    <span>Campos totales</span>
+                </article>
+                <article class="mini-stat">
+                    <strong>{{ stats.relations }}</strong>
+                    <span>Relaciones</span>
+                </article>
+                <article class="mini-stat">
+                    <strong>{{ stats.selects }}</strong>
+                    <span>Listas</span>
+                </article>
+            </div>
+            <div class="structure-grid">
+                {% for item in field_cards %}
+                    <article class="field-card {% if item.is_editing %}field-card-editing{% endif %}">
+                        <div class="member-row">
+                            <div>
+                                <strong>{{ item.field.label }}</strong>
+                                {% if mode == 'advanced' %}<p class="field-key">{{ item.field.key }}</p>{% endif %}
+                            </div>
+                            <span class="pill">{{ item.field.get_field_type_display }}</span>
+                        </div>
+                        <p>{{ item.field.help_text|default:"Sin ayuda configurada." }}</p>
+                        <div class="tag-list">
+                            {% if item.field.required %}<span class="tag">Obligatorio</span>{% endif %}
+                            {% if item.field.show_in_table %}<span class="tag">Visible en tabla</span>{% endif %}
+                            {% if item.has_data %}<span class="tag">Tiene datos cargados</span>{% endif %}
+                            {% if item.field.field_type == 'select' %}
+                                {% for option in item.field.get_options %}
+                                    <span class="tag">{{ option }}</span>
+                                {% endfor %}
+                            {% endif %}
+                            {% if item.field.field_type == 'relation' and item.field.relation_database %}
+                                <span class="tag">Relaciona con {{ item.field.relation_database.name }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="field-card-actions">
+                            {% if membership.role == 'admin' %}
+                                <a class="pill is-active" href="?tab=structure&mode={{ mode }}&edit_field={{ item.field.pk }}">Editar</a>
+                                <form method="post" action="{% url 'field_delete' database.slug item.field.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="field-delete-button">Eliminar</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                        {% if membership.role == 'admin' and item.is_editing %}
+                            <form method="post" action="{% url 'field_update' database.slug item.field.pk %}" class="stack-form compact field-editor-inline">
+                                {% csrf_token %}
+                                {% if item.has_data %}
+                                    <div class="empty-state">
+                                        <h3>Campo con datos existentes</h3>
+                                        <p>Puedes renombrarlo o ajustar ayudas y visibilidad, pero no cambiarlo a un tipo distinto sin migrar esos datos.</p>
+                                    </div>
+                                {% endif %}
+                                {% for field in item.form %}
+                                    <label class="field">
+                                        <span>{{ field.label }}</span>
+                                        {{ field }}
+                                    {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                                    {{ field.errors }}
+                                </label>
+                            {% endfor %}
+                                <div class="form-preview-inline">
+                                    <h4>Vista previa</h4>
+                                    <div class="field">
+                                        <span>{{ item.form.label.value|default:item.field.label }}</span>
+                                        <input type="text" placeholder="Asi se vera este dato al cargar">
+                                    </div>
+                                </div>
+                                <div class="hero-actions">
+                                    <button type="submit" class="button">Guardar cambios</button>
+                                    <a class="button subtle" href="?tab=structure&mode={{ mode }}">Cancelar</a>
+                                </div>
+                            </form>
+                        {% endif %}
+                    </article>
+                {% empty %}
+                    <div class="empty-state">
+                        <h3>No hay campos definidos</h3>
+                        <p>Agrega los primeros campos para darle estructura a la base.</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Nuevo campo</h2>
+                <p>{% if membership.role == 'admin' %}Crea campos, listas o relaciones con un formulario guiado.{% else %}Solo los administradores pueden cambiar la estructura.{% endif %}</p>
+            </div>
+            {% if membership.role == 'admin' %}
+                <form method="post" action="{% url 'field_create' database.slug %}" class="stack-form compact">
+                    {% csrf_token %}
+                    <h3>Agregar campo o relacion</h3>
+                    {% for field in field_form %}
+                        <label class="field">
+                            <span>{{ field.label }}</span>
+                            {{ field }}
+                            {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                            {{ field.errors }}
+                        </label>
+                    {% endfor %}
+                    <div class="form-preview-inline">
+                        <h4>Vista previa del formulario</h4>
+                        <div class="field">
+                            <span>Nombre principal</span>
+                            <input type="text" placeholder="Ejemplo de carga simple">
+                        </div>
+                        {% for field in basic_fields_preview %}
+                            <div class="field">
+                                <span>{{ field.label }}</span>
+                                <input type="text" placeholder="{{ field.help_text|default:'Dato esperado' }}">
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button type="submit" class="button">Guardar campo</button>
+                </form>
+            {% else %}
+                <div class="empty-state">
+                    <h3>Edicion bloqueada</h3>
+                    <p>Pide acceso de administrador para cambiar campos, opciones o relaciones.</p>
+                </div>
+            {% endif %}
+        </article>
+    </section>
+{% endif %}
+
+{% if active_tab == 'manage' %}
+    <section class="detail-grid">
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Datos y operaciones</h2>
+                <p>Importa datos reales, exporta la base o mueve informacion fuera del sistema.</p>
+            </div>
+            <form method="post" action="{% url 'records_import' database.slug %}" enctype="multipart/form-data" class="stack-form compact">
+                {% csrf_token %}
+                <h3>Importacion guiada</h3>
+                {% for field in import_form %}
+                    <label class="field">
+                        <span>{{ field.label }}</span>
+                        {{ field }}
+                        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                        {{ field.errors }}
+                    </label>
+                {% endfor %}
+                <small>Primero subirás el archivo y luego podrás decidir a qué dato corresponde cada columna.</small>
+                <button type="submit" class="button">Siguiente: mapear columnas</button>
+            </form>
+            <div class="hero-actions top-gap">
+                <a class="button subtle" href="{% url 'records_export' database.slug %}">Exportar CSV</a>
+            </div>
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Equipo y permisos</h2>
+                <p>Gestiona quien puede editar la base y quien solo colabora.</p>
+            </div>
+            <div class="member-list">
+                {% for member in database.memberships.all %}
+                    <div class="member-row">
+                        <strong>{{ member.user.username }}</strong>
+                        <span>{{ member.get_role_display }}</span>
+                    </div>
+                {% endfor %}
+            </div>
+            {% if membership.role == 'admin' %}
+                <form method="post" action="{% url 'member_create' database.slug %}" class="stack-form compact">
+                    {% csrf_token %}
+                    <h3>Asignar rol</h3>
+                    {% for field in member_form %}
+                        <label class="field">
+                            <span>{{ field.label }}</span>
+                            {{ field }}
+                            {{ field.errors }}
+                        </label>
+                    {% endfor %}
+                    <button type="submit" class="button">Actualizar miembro</button>
+                </form>
+            {% endif %}
+        </article>
+    </section>
+{% endif %}
+{% endblock %}

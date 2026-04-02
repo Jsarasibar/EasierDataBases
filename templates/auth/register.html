@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Crear cuenta{% endblock %}
+
+{% block content %}
+<section class="auth-card">
+    <div>
+        <span class="eyebrow">Registro</span>
+        <h1>Crea tu cuenta</h1>
+        <p>En menos de un minuto podes tener tu primera base de productos funcionando.</p>
+    </div>
+    <form method="post" class="stack-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% for field in form %}
+            <label class="field">
+                <span>{{ field.label }}</span>
+                {{ field }}
+                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                {{ field.errors }}
+            </label>
+        {% endfor %}
+        <button type="submit" class="button">Crear cuenta</button>
+    </form>
+</section>
+{% endblock %}

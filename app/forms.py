@@ -1,0 +1,420 @@
+import csv
+import io
+import uuid
+from decimal import Decimal, InvalidOperation
+from pathlib import Path
+
+from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.core.exceptions import ValidationError
+from django.db.models import Max
+from django.utils.text import slugify
+
+from django.conf import settings
+
+from .models import AppDatabase, CustomField, DatabaseMembership, Record, SavedView
+
+
+User = get_user_model()
+
+
+class LoginForm(AuthenticationForm):
+    username = forms.CharField(label="Usuario")
+
+
+class RegisterForm(UserCreationForm):
+    email = forms.EmailField(label="Email")
+    first_name = forms.CharField(label="Nombre", max_length=30, required=False)
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ("username", "first_name", "email")
+
+
+class DatabaseForm(forms.ModelForm):
+    starter_template = forms.ChoiceField(
+        label="Plantilla inicial",
+        initial="inventory",
+        choices=(
+            ("inventory", "Productos / Inventario"),
+            ("students", "Alumnos / Cursos"),
+            ("clients", "Clientes / Contactos"),
+            ("generic", "Otra / General"),
+            ("blank", "Empezar desde cero"),
+        ),
+        help_text="Te da una estructura inicial editable. Luego podes agregar, quitar o cambiar campos.",
+    )
+    suggested_fields = forms.MultipleChoiceField(
+        label="Campos sugeridos opcionales",
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+    load_demo_data = forms.BooleanField(
+        label="Cargar ejemplos para entender la base",
+        required=False,
+        initial=True,
+    )
+
+    class Meta:
+        model = AppDatabase
+        fields = ("name", "description", "use_case")
+        labels = {
+            "name": "Nombre de la base",
+            "description": "Descripcion",
+            "use_case": "Caso de uso inicial",
+        }
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        suggested_choices = kwargs.pop("suggested_choices", ())
+        super().__init__(*args, **kwargs)
+        self.fields["suggested_fields"].choices = suggested_choices
+        self.fields["suggested_fields"].help_text = "Selecciona extras utiles para arrancar sin pensar toda la estructura."
+
+
+class WizardTemplateForm(forms.Form):
+    starter_template = forms.ChoiceField(
+        label="Plantilla inicial",
+        initial="inventory",
+        choices=(
+            ("inventory", "Productos / Inventario"),
+            ("students", "Alumnos / Cursos"),
+            ("clients", "Clientes / Contactos"),
+            ("generic", "Otra / General"),
+            ("blank", "Empezar desde cero"),
+        ),
+    )
+    use_case = forms.ChoiceField(
+        label="Uso principal",
+        choices=AppDatabase.UseCase.choices,
+        initial=AppDatabase.UseCase.INVENTORY,
+    )
+
+
+class WizardSetupForm(forms.Form):
+    name = forms.CharField(label="Nombre de tu lista", max_length=120)
+    description = forms.CharField(
+        label="Para que la vas a usar",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
+
+
+class WizardOptionsForm(forms.Form):
+    suggested_fields = forms.MultipleChoiceField(
+        label="Extras recomendados",
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+    load_demo_data = forms.BooleanField(
+        label="Cargar ejemplos para entender la base",
+        required=False,
+        initial=True,
+    )
+    preferred_mode = forms.ChoiceField(
+        label="Como quieres empezar a usarla",
+        choices=(
+            ("basic", "Modo simple"),
+            ("advanced", "Modo avanzado"),
+        ),
+        initial="basic",
+    )
+
+    def __init__(self, *args, **kwargs):
+        suggested_choices = kwargs.pop("suggested_choices", ())
+        super().__init__(*args, **kwargs)
+        self.fields["suggested_fields"].choices = suggested_choices
+
+
+class SaveViewForm(forms.ModelForm):
+    class Meta:
+        model = SavedView
+        fields = ("name",)
+        labels = {"name": "Nombre de la vista"}
+
+
+class CSVMappingForm(forms.Form):
+    def __init__(self, database, headers, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = [("__ignore__", "Ignorar"), ("title", "Nombre principal"), ("priority", "Prioridad")]
+        choices += [(field.key, field.label) for field in database.fields.all()]
+        for header in headers:
+            self.fields[f"map_{header}"] = forms.ChoiceField(
+                label=header,
+                choices=choices,
+            )
+
+
+class CSVImportForm(forms.Form):
+    csv_file = forms.FileField(label="Archivo CSV")
+    has_header = forms.BooleanField(
+        label="El archivo tiene encabezados",
+        required=False,
+        initial=True,
+    )
+
+    def __init__(self, database, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.database = database
+
+    def clean_csv_file(self):
+        csv_file = self.cleaned_data["csv_file"]
+        if not csv_file.name.lower().endswith(".csv"):
+            raise ValidationError("Sube un archivo con extension .csv.")
+        return csv_file
+
+    def save_temporary_upload(self):
+        csv_file = self.cleaned_data["csv_file"]
+        import_dir = Path(settings.BASE_DIR) / "tmp" / "imports"
+        import_dir.mkdir(parents=True, exist_ok=True)
+        suffix = Path(csv_file.name).suffix or ".csv"
+        temp_name = f"{uuid.uuid4().hex}{suffix}"
+        temp_path = import_dir / temp_name
+        with temp_path.open("wb") as destination:
+            for chunk in csv_file.chunks():
+                destination.write(chunk)
+        return str(temp_path)
+
+    def inspect_file(self, file_path, preview_limit=5):
+        rows = list(self.iter_rows(file_path))
+        headers = list(rows[0].keys()) if rows else []
+        return {
+            "headers": headers,
+            "preview_rows": rows[:preview_limit],
+            "total_rows": len(rows),
+        }
+
+    def iter_rows(self, file_path):
+        with Path(file_path).open("r", encoding="utf-8-sig", newline="") as csv_handle:
+            content = csv_handle.read()
+        buffer = io.StringIO(content)
+        sample = content[:2048]
+        try:
+            dialect = csv.Sniffer().sniff(sample or "title,priority")
+        except csv.Error:
+            dialect = csv.excel
+
+        if self.cleaned_data.get("has_header", True):
+            reader = csv.DictReader(buffer, dialect=dialect)
+            if not reader.fieldnames:
+                raise ValidationError("No se encontraron encabezados en el CSV.")
+            for row in reader:
+                yield row
+            return
+
+        reader = csv.reader(buffer, dialect=dialect)
+        fields = ["title", "priority"] + [field.key for field in self.database.fields.all()]
+        for row in reader:
+            mapped = {}
+            for index, key in enumerate(fields):
+                mapped[key] = row[index] if index < len(row) else ""
+            yield mapped
+
+
+class CustomFieldForm(forms.ModelForm):
+    class Meta:
+        model = CustomField
+        fields = (
+            "label",
+            "field_type",
+            "help_text",
+            "options_text",
+            "relation_database",
+            "required",
+            "show_in_table",
+        )
+        labels = {
+            "label": "Nombre del campo",
+            "field_type": "Tipo",
+            "help_text": "Ayuda",
+            "options_text": "Opciones",
+            "relation_database": "Base relacionada",
+            "required": "Obligatorio",
+            "show_in_table": "Mostrar en la tabla principal",
+        }
+        widgets = {
+            "options_text": forms.Textarea(
+                attrs={
+                    "rows": 4,
+                    "placeholder": "Una opcion por linea\nPendiente\nEn progreso\nCompletado",
+                }
+            ),
+        }
+
+    def __init__(self, database, *args, **kwargs):
+        self.actor = kwargs.pop("actor", None)
+        super().__init__(*args, **kwargs)
+        self.database = database
+        relation_queryset = AppDatabase.objects.exclude(pk=database.pk).order_by("name")
+        if self.actor:
+            relation_queryset = relation_queryset.filter(memberships__user=self.actor).distinct()
+        self.fields["relation_database"].queryset = relation_queryset
+        self.fields["options_text"].help_text = "Solo para campos de seleccion. Una opcion por linea."
+        self.fields["relation_database"].help_text = "Solo para campos de relacion. Elegi la base a la que vas a apuntar."
+
+    def _field_has_existing_data(self):
+        if not self.instance.pk:
+            return False
+        field_key = self.instance.key
+        for record in self.database.records.only("data"):
+            if field_key in (record.data or {}) and record.data.get(field_key) not in ("", None):
+                return True
+        return False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        field_type = cleaned_data.get("field_type")
+        options_text = (cleaned_data.get("options_text") or "").strip()
+        relation_database = cleaned_data.get("relation_database")
+        previous_type = self.instance.field_type if self.instance.pk else None
+
+        if field_type == CustomField.FieldType.SELECT and not options_text:
+            self.add_error("options_text", "Define al menos una opcion para este campo.")
+        if field_type == CustomField.FieldType.RELATION and not relation_database:
+            self.add_error("relation_database", "Elegi una base relacionada.")
+        if (
+            self.instance.pk
+            and previous_type
+            and field_type
+            and previous_type != field_type
+            and self._field_has_existing_data()
+        ):
+            self.add_error(
+                "field_type",
+                "No puedes cambiar el tipo de un campo que ya tiene datos. Crea uno nuevo o vacia los registros primero.",
+            )
+        if field_type != CustomField.FieldType.SELECT:
+            cleaned_data["options_text"] = ""
+        if field_type != CustomField.FieldType.RELATION:
+            cleaned_data["relation_database"] = None
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.database = self.database
+        if not instance.pk:
+            instance.key = slugify(instance.label).replace("-", "_")
+            max_position = self.database.fields.aggregate(Max("position"))["position__max"] or 0
+            instance.position = max_position + 1
+        if commit:
+            instance.save()
+        return instance
+
+
+class MembershipForm(forms.Form):
+    username = forms.CharField(label="Usuario")
+    role = forms.ChoiceField(label="Rol", choices=DatabaseMembership.Role.choices)
+
+    def __init__(self, database, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.database = database
+
+    def clean_username(self):
+        username = self.cleaned_data["username"]
+        try:
+            return User.objects.get(username=username)
+        except User.DoesNotExist as exc:
+            raise ValidationError("No existe un usuario con ese nombre.") from exc
+
+    def save(self):
+        user = self.cleaned_data["username"]
+        membership, _ = DatabaseMembership.objects.update_or_create(
+            database=self.database,
+            user=user,
+            defaults={"role": self.cleaned_data["role"]},
+        )
+        return membership
+
+
+class RecordForm(forms.Form):
+    title = forms.CharField(label="Nombre del registro", max_length=160)
+    priority = forms.ChoiceField(label="Prioridad", choices=Record.Priority.choices)
+
+    def __init__(self, database, *args, record=None, actor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.database = database
+        self.record = record
+        self.actor = actor
+
+        if record:
+            self.fields["title"].initial = record.title
+            self.fields["priority"].initial = record.priority
+
+        for field in database.fields.all():
+            self.fields[field.key] = self._build_form_field(field)
+            if record:
+                self.fields[field.key].initial = record.data.get(field.key)
+
+    def _build_form_field(self, custom_field):
+        common = {
+            "label": custom_field.label,
+            "required": custom_field.required,
+            "help_text": custom_field.help_text,
+        }
+        if custom_field.field_type == CustomField.FieldType.NUMBER:
+            return forms.DecimalField(decimal_places=2, **common)
+        if custom_field.field_type == CustomField.FieldType.CURRENCY:
+            return forms.DecimalField(decimal_places=2, **common)
+        if custom_field.field_type == CustomField.FieldType.BOOLEAN:
+            return forms.BooleanField(
+                required=False,
+                label=custom_field.label,
+                help_text=custom_field.help_text,
+            )
+        if custom_field.field_type == CustomField.FieldType.DATE:
+            return forms.DateField(widget=forms.DateInput(attrs={"type": "date"}), **common)
+        if custom_field.field_type == CustomField.FieldType.EMAIL:
+            return forms.EmailField(**common)
+        if custom_field.field_type == CustomField.FieldType.PHONE:
+            return forms.CharField(**common)
+        if custom_field.field_type == CustomField.FieldType.SELECT:
+            options = [(option, option) for option in custom_field.get_options()]
+            return forms.ChoiceField(choices=options, **common)
+        if custom_field.field_type == CustomField.FieldType.RELATION:
+            queryset = Record.objects.none()
+            if (
+                custom_field.relation_database
+                and self.actor
+                and custom_field.relation_database.memberships.filter(user=self.actor).exists()
+            ):
+                queryset = custom_field.relation_database.records.all()
+            return forms.ModelChoiceField(
+                queryset=queryset,
+                empty_label="Selecciona un registro",
+                **common,
+            )
+        return forms.CharField(**common)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        data = {}
+        for field in self.database.fields.all():
+            value = cleaned_data.get(field.key)
+            if value in ("", None):
+                data[field.key] = False if field.field_type == CustomField.FieldType.BOOLEAN else ""
+                continue
+            if field.field_type in {CustomField.FieldType.NUMBER, CustomField.FieldType.CURRENCY}:
+                try:
+                    data[field.key] = str(Decimal(value))
+                except (InvalidOperation, TypeError) as exc:
+                    raise ValidationError(f"El campo {field.label} debe ser numerico.") from exc
+            elif field.field_type == CustomField.FieldType.DATE:
+                data[field.key] = value.isoformat()
+            elif field.field_type == CustomField.FieldType.RELATION:
+                data[field.key] = str(value.pk)
+            else:
+                data[field.key] = value
+        cleaned_data["record_data"] = data
+        return cleaned_data
+
+    def save(self, user):
+        record = self.record or Record(database=self.database, created_by=user)
+        record.title = self.cleaned_data["title"]
+        record.priority = self.cleaned_data["priority"]
+        record.data = self.cleaned_data["record_data"]
+        record.updated_by = user
+        record.save()
+        return record

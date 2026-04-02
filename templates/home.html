@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Plataforma no-code para bases simples{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-copy">
+        <span class="eyebrow">Plataforma visual y generalista</span>
+        <h1>Organiza cualquier tipo de informacion sin pelearte con Excel ni aprender sistemas complejos.</h1>
+        <p>
+            Crea una base visual, define tus propios campos y administra registros con filtros,
+            prioridades y roles basicos. Puedes empezar con productos, alumnos, clientes o una
+            estructura general y luego adaptarla a tu negocio.
+        </p>
+        <div class="hero-actions">
+            <a class="button" href="{% url 'register' %}">Probar el MVP</a>
+            <a class="button subtle" href="{% url 'login' %}">Ya tengo cuenta</a>
+        </div>
+    </div>
+    <div class="hero-card">
+        <div class="metric">
+            <strong>Sin codigo</strong>
+            <span>La estructura de datos se define con formularios visuales.</span>
+        </div>
+        <div class="metric">
+            <strong>Plantillas de arranque</strong>
+            <span>Empieza rapido con productos, alumnos, clientes o una base general.</span>
+        </div>
+        <div class="metric">
+            <strong>Extensible</strong>
+            <span>La estructura se adapta a cualquier operacion simple que un negocio necesite gestionar.</span>
+        </div>
+    </div>
+</section>
+{% endblock %}

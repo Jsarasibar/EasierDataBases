@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}EasierDataBases{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'styles/app.css' %}">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="site-header">
+            <a class="brand" href="{% url 'home' %}">EasierDataBases</a>
+            <nav class="top-nav">
+                {% if request.user.is_authenticated %}
+                    <a href="{% url 'dashboard' %}">Dashboard</a>
+                    <form action="{% url 'logout' %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit" class="link-button">Salir</button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'login' %}">Ingresar</a>
+                    <a class="button subtle" href="{% url 'register' %}">Crear cuenta</a>
+                {% endif %}
+            </nav>
+        </header>
+
+        {% if messages %}
+            <section class="messages">
+                {% for message in messages %}
+                    <div class="message {{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </section>
+        {% endif %}
+
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

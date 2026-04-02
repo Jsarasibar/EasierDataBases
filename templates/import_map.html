@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load app_extras %}
+
+{% block title %}Mapear importacion{% endblock %}
+
+{% block content %}
+<section class="panel narrow">
+    <div class="panel-head">
+        <span class="eyebrow">{{ database.name }}</span>
+        <h1>Mapear columnas del archivo</h1>
+        <p>Relaciona cada columna del CSV con el dato correcto antes de importar las {{ total_rows }} filas detectadas.</p>
+    </div>
+    <form method="post" class="stack-form">
+        {% csrf_token %}
+        {% for field in form %}
+            <label class="field">
+                <span>{{ field.label }}</span>
+                {{ field }}
+                {{ field.errors }}
+            </label>
+        {% endfor %}
+        <button type="submit" class="button">Importar con este mapeo</button>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Vista previa</h2>
+        <p>Primeras filas detectadas para confirmar que el archivo es el correcto. La importacion final procesara el archivo completo.</p>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    {% for header in headers %}
+                        <th>{{ header }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in preview_rows %}
+                    <tr>
+                        {% for header in headers %}
+                            <td>{{ row|get_item:header }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

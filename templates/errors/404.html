@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Pagina no encontrada{% endblock %}
+
+{% block content %}
+<section class="auth-card">
+    <span class="eyebrow">404</span>
+    <h1>La pagina no existe</h1>
+    <p>Puede que el enlace este incompleto o que el contenido ya no este disponible.</p>
+    <a class="button subtle" href="{% url 'dashboard' %}">Ir al dashboard</a>
+</section>
+{% endblock %}

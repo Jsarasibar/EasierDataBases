@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}{% if mode == 'edit' %}Editar registro{% else %}Nuevo registro{% endif %}{% endblock %}
+
+{% block content %}
+<section class="panel narrow">
+    <div class="panel-head">
+        <span class="eyebrow">{{ database.name }}</span>
+        <h1>{% if mode == 'edit' %}Editar registro{% else %}Nuevo registro{% endif %}</h1>
+        <p>Carga informacion sin programar y respetando la estructura definida para la base.</p>
+    </div>
+    <form method="post" class="stack-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% for field in form %}
+            <label class="field">
+                <span>{{ field.label }}</span>
+                {{ field }}
+                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                {{ field.errors }}
+            </label>
+        {% endfor %}
+        <div class="hero-actions">
+            <button type="submit" class="button">Guardar</button>
+            <a class="button subtle" href="{% url 'database_detail' database.slug %}">Cancelar</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Error interno{% endblock %}
+
+{% block content %}
+<section class="auth-card">
+    <span class="eyebrow">500</span>
+    <h1>Ocurrio un error interno</h1>
+    <p>Ya registramos el problema para revisarlo. Intenta nuevamente en unos minutos.</p>
+    <a class="button subtle" href="{% url 'home' %}">Volver al inicio</a>
+</section>
+{% endblock %}

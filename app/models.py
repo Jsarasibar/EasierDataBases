@@ -1,0 +1,213 @@
+from django.conf import settings
+from django.db import models
+from django.utils.text import slugify
+
+
+class AppDatabase(models.Model):
+    class UseCase(models.TextChoices):
+        INVENTORY = "inventory", "Inventario / Productos"
+        STUDENTS = "students", "Alumnos"
+        CLIENTS = "clients", "Clientes"
+        GENERIC = "generic", "General"
+
+    name = models.CharField(max_length=120)
+    slug = models.SlugField(max_length=140, unique=True)
+    description = models.TextField(blank=True)
+    use_case = models.CharField(
+        max_length=20,
+        choices=UseCase.choices,
+        default=UseCase.INVENTORY,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="created_databases",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.name) or "base"
+            slug = base_slug
+            counter = 2
+            while AppDatabase.objects.exclude(pk=self.pk).filter(slug=slug).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+
+class DatabaseMembership(models.Model):
+    class Role(models.TextChoices):
+        ADMIN = "admin", "Administrador"
+        EDITOR = "editor", "Editor"
+
+    database = models.ForeignKey(
+        AppDatabase,
+        on_delete=models.CASCADE,
+        related_name="memberships",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="database_memberships",
+    )
+    role = models.CharField(max_length=12, choices=Role.choices, default=Role.EDITOR)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("database", "user")
+        ordering = ["database", "user__username"]
+
+    def __str__(self):
+        return f"{self.user} -> {self.database} ({self.get_role_display()})"
+
+
+class CustomField(models.Model):
+    class FieldType(models.TextChoices):
+        TEXT = "text", "Texto"
+        NUMBER = "number", "Numero"
+        CURRENCY = "currency", "Moneda"
+        BOOLEAN = "boolean", "Si / No"
+        DATE = "date", "Fecha"
+        EMAIL = "email", "Email"
+        PHONE = "phone", "Telefono"
+        SELECT = "select", "Seleccion"
+        RELATION = "relation", "Relacion con otra base"
+
+    database = models.ForeignKey(
+        AppDatabase,
+        on_delete=models.CASCADE,
+        related_name="fields",
+    )
+    label = models.CharField(max_length=80)
+    key = models.SlugField(max_length=80)
+    field_type = models.CharField(max_length=12, choices=FieldType.choices)
+    help_text = models.CharField(max_length=180, blank=True)
+    options_text = models.TextField(blank=True)
+    relation_database = models.ForeignKey(
+        AppDatabase,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="incoming_relation_fields",
+    )
+    required = models.BooleanField(default=False)
+    show_in_table = models.BooleanField(default=True)
+    position = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ("database", "key")
+        ordering = ["position", "id"]
+
+    def __str__(self):
+        return f"{self.database.name}: {self.label}"
+
+    def get_options(self):
+        return [option.strip() for option in self.options_text.splitlines() if option.strip()]
+
+    def save(self, *args, **kwargs):
+        if not self.key:
+            base_key = slugify(self.label).replace("-", "_") or "campo"
+            key = base_key
+            counter = 2
+            while CustomField.objects.exclude(pk=self.pk).filter(
+                database=self.database,
+                key=key,
+            ).exists():
+                key = f"{base_key}_{counter}"
+                counter += 1
+            self.key = key
+        super().save(*args, **kwargs)
+
+
+class Record(models.Model):
+    class Priority(models.TextChoices):
+        NORMAL = "normal", "Normal"
+        HIGH = "high", "Alta"
+        URGENT = "urgent", "Urgente"
+
+    database = models.ForeignKey(
+        AppDatabase,
+        on_delete=models.CASCADE,
+        related_name="records",
+    )
+    title = models.CharField(max_length=160)
+    priority = models.CharField(
+        max_length=12,
+        choices=Priority.choices,
+        default=Priority.NORMAL,
+    )
+    data = models.JSONField(default=dict, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_records",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="updated_records",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+
+    def __str__(self):
+        return self.title
+
+    def get_value(self, field):
+        return self.data.get(field.key, "")
+
+    def get_display_value(self, field):
+        value = self.get_value(field)
+        if value in ("", None):
+            return ""
+        if field.field_type == CustomField.FieldType.BOOLEAN:
+            return "Si" if value else "No"
+        if field.field_type == CustomField.FieldType.RELATION and field.relation_database:
+            try:
+                related_record = field.relation_database.records.get(pk=int(value))
+                return related_record.title
+            except (ValueError, TypeError, Record.DoesNotExist):
+                return value
+        return value
+
+
+class SavedView(models.Model):
+    database = models.ForeignKey(
+        AppDatabase,
+        on_delete=models.CASCADE,
+        related_name="saved_views",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="saved_views",
+    )
+    name = models.CharField(max_length=80)
+    query = models.CharField(max_length=120, blank=True)
+    priority = models.CharField(max_length=12, blank=True)
+    sort = models.CharField(max_length=20, default="updated")
+    view_mode = models.CharField(max_length=12, default="table")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("database", "user", "name")
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.database.name}: {self.name}"

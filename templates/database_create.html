@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Asistente de creación{% endblock %}
+
+{% block content %}
+<section class="wizard-shell">
+    <article class="panel">
+        <div class="panel-head">
+            <span class="eyebrow">Asistente de creación</span>
+            <h1>Vamos a armar tu lista sin meterte en complejidad técnica.</h1>
+            <p>El asistente te guía, recomienda y te muestra una vista previa. No bloquea decisiones ni fija nada para siempre.</p>
+        </div>
+
+        <div class="wizard-steps">
+            <div class="wizard-step {% if step == '1' %}is-current{% endif %}">1. Elegir base</div>
+            <div class="wizard-step {% if step == '2' %}is-current{% endif %}">2. Nombrarla</div>
+            <div class="wizard-step {% if step == '3' %}is-current{% endif %}">3. Completarla</div>
+            <div class="wizard-step {% if step == '4' %}is-current{% endif %}">4. Confirmar</div>
+        </div>
+
+        {% if step == '1' %}
+            <form method="post" class="stack-form">
+                {% csrf_token %}
+                <input type="hidden" name="step" value="1">
+                <div class="field">
+                    <span>{{ template_form.starter_template.label }}</span>
+                    <small>El asistente usa esta elección para recomendar nombre, extras y ejemplos. Luego podrás cambiar lo que quieras.</small>
+                    <div class="template-selector">
+                        {% for template in templates_catalog %}
+                            <label class="template-option">
+                                <input type="radio" name="starter_template" value="{{ template.key }}" {% if wizard_state.starter_template == template.key %}checked{% endif %}>
+                                <div class="template-option-body">
+                                    <strong>{{ template.title }}</strong>
+                                    <p>{{ template.description }}</p>
+                                    <div class="tag-list">
+                                        {% for field in template.fields %}
+                                            <span class="tag">{{ field }}</span>
+                                        {% empty %}
+                                            <span class="tag">Sin campos base</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </label>
+                        {% endfor %}
+                    </div>
+                    {{ template_form.starter_template.errors }}
+                </div>
+                <label class="field">
+                    <span>{{ template_form.use_case.label }}</span>
+                    {{ template_form.use_case }}
+                    {{ template_form.use_case.errors }}
+                </label>
+                <div class="hero-actions">
+                    <button type="submit" class="button">Siguiente</button>
+                </div>
+            </form>
+        {% endif %}
+
+        {% if step == '2' %}
+            <form method="post" class="stack-form">
+                {% csrf_token %}
+                <input type="hidden" name="step" value="2">
+                <input type="hidden" name="starter_template" value="{{ wizard_state.starter_template }}">
+                <input type="hidden" name="use_case" value="{{ wizard_state.use_case }}">
+                <label class="field">
+                    <span>{{ setup_form.name.label }}</span>
+                    {{ setup_form.name }}
+                    <small>Consejo del asistente: un nombre simple y reconocible ayuda a encontrar la lista más rápido.</small>
+                    {{ setup_form.name.errors }}
+                </label>
+                <label class="field">
+                    <span>{{ setup_form.description.label }}</span>
+                    {{ setup_form.description }}
+                    <small>Describe en una frase qué vas a guardar aquí. Te sirve a ti y a cualquiera que entre después.</small>
+                    {{ setup_form.description.errors }}
+                </label>
+                <div class="hero-actions">
+                    <a class="button subtle" href="?step=1&starter_template={{ wizard_state.starter_template }}&use_case={{ wizard_state.use_case }}">Volver</a>
+                    <button type="submit" class="button">Siguiente</button>
+                </div>
+            </form>
+        {% endif %}
+
+        {% if step == '3' %}
+            <form method="post" class="stack-form">
+                {% csrf_token %}
+                <input type="hidden" name="step" value="3">
+                <input type="hidden" name="starter_template" value="{{ wizard_state.starter_template }}">
+                <input type="hidden" name="use_case" value="{{ wizard_state.use_case }}">
+                <input type="hidden" name="name" value="{{ wizard_state.name }}">
+                <input type="hidden" name="description" value="{{ wizard_state.description }}">
+                <div class="field">
+                    <span>{{ options_form.suggested_fields.label }}</span>
+                    <small>El asistente marca extras comunes para que no tengas que pensar toda la estructura desde cero.</small>
+                    <div class="checkbox-list">
+                        {{ options_form.suggested_fields }}
+                    </div>
+                    {{ options_form.suggested_fields.errors }}
+                </div>
+                <label class="field checkbox-line">
+                    <span>{{ options_form.load_demo_data.label }}</span>
+                    {{ options_form.load_demo_data }}
+                    <small>Los ejemplos sirven para entender cómo se usa la lista. Puedes borrarlos después.</small>
+                </label>
+                <label class="field">
+                    <span>{{ options_form.preferred_mode.label }}</span>
+                    {{ options_form.preferred_mode }}
+                    <small>Modo simple oculta parte de la complejidad y te lleva primero a trabajar.</small>
+                </label>
+                <div class="hero-actions">
+                    <a class="button subtle" href="?step=2&starter_template={{ wizard_state.starter_template }}&use_case={{ wizard_state.use_case }}&name={{ wizard_state.name|urlencode }}&description={{ wizard_state.description|urlencode }}">Volver</a>
+                    <button type="submit" class="button">Ver confirmación</button>
+                </div>
+            </form>
+        {% endif %}
+
+        {% if step == '4' %}
+            <form method="post" class="stack-form">
+                {% csrf_token %}
+                <input type="hidden" name="step" value="4">
+                <input type="hidden" name="starter_template" value="{{ wizard_state.starter_template }}">
+                <input type="hidden" name="use_case" value="{{ wizard_state.use_case }}">
+                <input type="hidden" name="name" value="{{ wizard_state.name }}">
+                <input type="hidden" name="description" value="{{ wizard_state.description }}">
+                {% for item in wizard_state.suggested_fields %}
+                    <input type="hidden" name="suggested_fields" value="{{ item }}">
+                {% endfor %}
+                {% if wizard_state.load_demo_data %}<input type="hidden" name="load_demo_data" value="on">{% endif %}
+                <input type="hidden" name="preferred_mode" value="{{ wizard_state.preferred_mode }}">
+
+                <div class="wizard-summary">
+                    <div class="record-meta">
+                        <div class="record-meta-row"><span>Tipo de lista</span><strong>{{ assistant.suggested_name|default:wizard_state.starter_template }}</strong></div>
+                        <div class="record-meta-row"><span>Nombre</span><strong>{{ wizard_state.name }}</strong></div>
+                        <div class="record-meta-row"><span>Modo inicial</span><strong>{% if wizard_state.preferred_mode == 'basic' %}Simple{% else %}Avanzado{% endif %}</strong></div>
+                        <div class="record-meta-row"><span>Ejemplos cargados</span><strong>{% if wizard_state.load_demo_data %}Sí{% else %}No{% endif %}</strong></div>
+                    </div>
+                    <div class="tag-list">
+                        {% for field in preview_template_fields %}
+                            <span class="tag">{{ field }}</span>
+                        {% endfor %}
+                        {% for field in preview_extras %}
+                            <span class="tag">{{ field }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="hero-actions">
+                    <a class="button subtle" href="?step=3&starter_template={{ wizard_state.starter_template }}&use_case={{ wizard_state.use_case }}&name={{ wizard_state.name|urlencode }}&description={{ wizard_state.description|urlencode }}">Volver</a>
+                    <button type="submit" class="button">Crear lista con el asistente</button>
+                </div>
+            </form>
+        {% endif %}
+    </article>
+
+    <aside class="panel wizard-side">
+        <div class="panel-head">
+            <h2>Cómo ayuda el asistente</h2>
+            <p>Te acompaña hasta dejar una base inicial lista, pero no invade tus decisiones.</p>
+        </div>
+        <div class="stack-form compact">
+            <div class="assistant-note">
+                <strong>Qué hace</strong>
+                <p>{{ assistant.goal }}</p>
+            </div>
+            <div class="assistant-note">
+                <strong>Qué recomienda</strong>
+                <p>Nombre claro, estructura base, extras comunes, ejemplos opcionales y un modo de uso inicial.</p>
+            </div>
+            <div class="assistant-note">
+                <strong>Hasta dónde se mete</strong>
+                <p>{{ assistant.watchout }}</p>
+            </div>
+            <div class="assistant-note">
+                <strong>Qué no hace</strong>
+                <p>No crea automatizaciones, no decide relaciones complejas por ti y no bloquea cambios posteriores.</p>
+            </div>
+        </div>
+    </aside>
+</section>
+{% endblock %}

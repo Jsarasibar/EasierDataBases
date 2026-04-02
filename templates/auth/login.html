@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Ingresar{% endblock %}
+
+{% block content %}
+<section class="auth-card">
+    <div>
+        <span class="eyebrow">Acceso</span>
+        <h1>Ingresar a tu workspace</h1>
+        <p>Administra tus bases, registros y permisos desde una sola vista.</p>
+    </div>
+    <form method="post" class="stack-form">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {% for field in form %}
+            <label class="field">
+                <span>{{ field.label }}</span>
+                {{ field }}
+                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                {{ field.errors }}
+            </label>
+        {% endfor %}
+        <button type="submit" class="button">Ingresar</button>
+    </form>
+    <div class="top-gap">
+        <a href="{% url 'password_reset' %}">Olvide mi contraseña</a>
+    </div>
+</section>
+{% endblock %}

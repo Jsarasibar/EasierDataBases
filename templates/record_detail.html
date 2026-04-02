@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load app_extras %}
+
+{% block title %}{{ record.title }}{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <div>
+        <span class="eyebrow">{{ database.name }}</span>
+        <h1>{{ record.title }}</h1>
+        <p>Vista completa del registro con sus datos y relaciones en ambos sentidos.</p>
+    </div>
+    <div class="hero-actions">
+        <a class="button" href="{% url 'record_edit' database.slug record.pk %}">Editar</a>
+        <a class="button subtle" href="{% url 'database_detail' database.slug %}">Volver a la base</a>
+    </div>
+</section>
+
+<section class="detail-grid">
+    <article class="panel">
+        <div class="panel-head">
+            <h2>Datos del registro</h2>
+            <p>Informacion principal y campos personalizados.</p>
+        </div>
+        <div class="record-meta">
+            <div class="record-meta-row">
+                <span>Prioridad</span>
+                <strong>{{ record.get_priority_display }}</strong>
+            </div>
+            {% for field in fields %}
+                <div class="record-meta-row">
+                    <span>{{ field.label }}</span>
+                    <strong>{{ record|display_value:field|default:"-" }}</strong>
+                </div>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h2>Relaciones salientes</h2>
+            <p>Registros a los que este elemento apunta.</p>
+        </div>
+        <div class="stack-form compact">
+            {% for relation in outgoing_relations %}
+                <a class="database-card" href="{% url 'record_detail' relation.database.slug relation.record.pk %}">
+                    <span class="pill">{{ relation.field.label }}</span>
+                    <h3>{{ relation.record.title }}</h3>
+                    <p>{{ relation.database.name }}</p>
+                </a>
+            {% empty %}
+                <div class="empty-state">
+                    <h3>Sin relaciones directas</h3>
+                    <p>Este registro no apunta a otros registros por ahora.</p>
+                </div>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Relaciones entrantes</h2>
+        <p>Otros registros que referencian a este elemento desde otras bases o campos.</p>
+    </div>
+    <div class="stack-form compact">
+        {% for group in incoming_relations %}
+            <article class="database-card">
+                <span class="pill">{{ group.database.name }}</span>
+                <h3>{{ group.field.label }}</h3>
+                <div class="tag-list">
+                    {% for linked_record in group.records %}
+                        <a class="tag" href="{% url 'record_detail' group.database.slug linked_record.pk %}">{{ linked_record.title }}</a>
+                    {% endfor %}
+                </div>
+            </article>
+        {% empty %}
+            <div class="empty-state">
+                <h3>Sin relaciones entrantes</h3>
+                <p>Ningun otro registro accesible lo referencia todavia.</p>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
