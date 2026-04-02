@@ -12,10 +12,6 @@ La version actual apunta a:
 - pilotos cerrados con usuarios reales,
 - validacion de producto en modelo SaaS simple.
 
-No esta pensada todavia como version final de lanzamiento publico masivo.
-
-## Problema que resuelve
-
 Muchas personas necesitan gestionar productos, alumnos, clientes, pedidos, tareas o cualquier otro conjunto de datos simple. En ese escenario suelen aparecer dos extremos:
 
 - las planillas son flexibles, pero se vuelven fragiles, desordenadas y dificiles de mantener;
@@ -106,25 +102,6 @@ Casos de uso que hoy encajan bien:
 - Aislamiento por membresia.
 - Restriccion de relaciones y registros segun acceso visible.
 
-## Enfoque de comercializacion actual
-
-Esta version ya esta preparada para una etapa de comercializacion inicial, pero con alcance controlado.
-
-Recomendada para:
-
-- mostrar el producto en demos,
-- hacer pilotos con clientes seleccionados,
-- vender pruebas cerradas,
-- validar usabilidad y propuesta de valor.
-
-Todavia no recomendada para:
-
-- apertura publica masiva,
-- permisos granulares complejos,
-- automatizaciones avanzadas,
-- dashboards ejecutivos,
-- billing integrado,
-- multi-tenant empresarial sofisticado.
 
 ## Stack tecnologico
 
@@ -314,31 +291,6 @@ Esto permite separar:
 - importacion/exportacion,
 - administracion basica del equipo.
 
-## Cobertura actual de tests
-
-La suite automatizada cubre flujos centrales del MVP, incluyendo:
-
-- creacion de bases con wizard,
-- creacion y edicion de registros,
-- plantillas iniciales,
-- importacion y exportacion CSV,
-- relaciones entre bases,
-- relaciones bidireccionales,
-- edicion de campos,
-- renombre seguro de campos,
-- importaciones de mas de 50 filas,
-- restricciones de acceso en relaciones,
-- bloqueo de borrado de campos con datos.
-
-## Criterios de calidad ya validados
-
-Actualmente el proyecto pasa:
-
-- `python manage.py test`
-- `python manage.py check --deploy`
-
-Esto no reemplaza un proceso completo de QA, pero si establece una base solida para demos y pilotos cerrados.
-
 ## Limitaciones actuales
 
 El producto todavia no incluye:
@@ -351,55 +303,3 @@ El producto todavia no incluye:
 - auditoria detallada de cambios,
 - permisos por campo o por accion fina,
 - organizaciones/workspaces de nivel enterprise.
-
-## Roadmap recomendado
-
-Siguientes pasos naturales para evolucionar el MVP:
-
-1. Introducir `workspace` u `organization` como frontera SaaS explicita.
-2. Agregar auditoria e historial de cambios.
-3. Mejorar importacion con reporte descargable de errores.
-4. Sumar relaciones mas ricas y vistas conectadas.
-5. Incorporar automatizaciones simples.
-6. Avanzar hacia onboarding asistido mas inteligente.
-
-## Demo comercial sugerida
-
-Para mostrar el producto hoy, los recorridos mas fuertes son:
-
-### Demo 1. Productos / Inventario
-
-Mostrar:
-
-- creacion con plantilla,
-- campos base,
-- prioridades,
-- importacion CSV,
-- filtro de urgentes,
-- edicion de estructura.
-
-### Demo 2. Clientes + Pedidos
-
-Mostrar:
-
-- dos bases relacionadas,
-- creacion de relacion,
-- carga de pedidos vinculados,
-- navegacion bidireccional,
-- vistas guardadas,
-- trabajo diario.
-
-## Licencia
-
-Este repositorio no define todavia una licencia publica. Si el proyecto va a distribuirse o compartirse externamente, conviene agregar una licencia explicita.
-
-## Contacto y uso interno
-
-Si este proyecto se usa como base para una demo comercial o piloto con clientes reales, se recomienda mantener registro de:
-
-- entorno desplegado,
-- variables de entorno usadas,
-- base de datos objetivo,
-- y alcance prometido al cliente.
-
-Eso ayuda a evitar vender funcionalidades que todavia no forman parte del MVP real.
