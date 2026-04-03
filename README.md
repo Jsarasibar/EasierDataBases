@@ -12,12 +12,7 @@ La version actual apunta a:
 - pilotos cerrados con usuarios reales,
 - validacion de producto en modelo SaaS simple.
 
-Muchas personas necesitan gestionar productos, alumnos, clientes, pedidos, tareas o cualquier otro conjunto de datos simple. En ese escenario suelen aparecer dos extremos:
-
-- las planillas son flexibles, pero se vuelven fragiles, desordenadas y dificiles de mantener;
-- los sistemas profesionales suelen ser demasiado rigidos o demasiado complejos para usuarios no tecnicos.
-
-EasierDataBases busca ocupar el espacio intermedio: una herramienta visual, adaptable y simple de entender, con estructura suficiente para ordenar la informacion sin exigir programacion.
+No esta pensada todavia como version final de lanzamiento publico masivo.
 
 ## Propuesta del MVP
 
@@ -34,13 +29,13 @@ Casos de uso que hoy encajan bien:
 
 ## Funcionalidades actuales
 
-### 1. Acceso y cuentas
+### Acceso y cuentas
 
 - Registro de usuarios.
 - Inicio y cierre de sesion.
 - Recuperacion de contrasena.
 
-### 2. Creacion guiada de bases
+### Creacion guiada de bases
 
 - Asistente de creacion por pasos.
 - Plantillas iniciales:
@@ -50,13 +45,13 @@ Casos de uso que hoy encajan bien:
   - Otra base
   - Desde cero
 - Extras sugeridos por plantilla.
-- Datos demo opcionales para entender el sistema desde el primer uso.
+- Datos demo opcionales.
 - Modo inicial simple o avanzado.
 
-### 3. Modelado visual de la base
+### Modelado visual de la base
 
 - Campos personalizados sin codigo.
-- Tipos de campo disponibles:
+- Tipos de campo:
   - texto
   - numero
   - moneda
@@ -67,25 +62,25 @@ Casos de uso que hoy encajan bien:
   - seleccion
   - relacion con otra base
 - Editor visual de estructura.
-- Vista previa del formulario de carga.
-- Reglas de seguridad para evitar cambios destructivos en campos con datos.
+- Vista previa del formulario.
+- Reglas de seguridad para evitar cambios destructivos.
 
-### 4. Operacion de registros
+### Operacion de registros
 
 - Crear, editar y eliminar registros.
 - Prioridades (`normal`, `high`, `urgent`).
 - Vista de tabla y vista de tarjetas.
 - Busqueda, filtros, orden y paginacion.
 - Vistas guardadas por usuario.
-- Pestaña de trabajo diario para operar mas rapido.
+- Pestaña de trabajo diario.
 
-### 5. Relaciones entre bases
+### Relaciones entre bases
 
 - Campos de relacion hacia otra base.
 - Navegacion bidireccional entre registros relacionados.
-- Restriccion de relaciones segun acceso autorizado del usuario.
+- Restriccion de relaciones segun acceso autorizado.
 
-### 6. Importacion y exportacion
+### Importacion y exportacion
 
 - Importacion CSV guiada por mapeo.
 - Vista previa antes de confirmar.
@@ -94,7 +89,7 @@ Casos de uso que hoy encajan bien:
 - Resumen de filas importadas y omitidas.
 - Exportacion CSV por base.
 
-### 7. Roles y acceso
+### Roles y acceso
 
 - Roles basicos por base:
   - administrador
@@ -102,14 +97,13 @@ Casos de uso que hoy encajan bien:
 - Aislamiento por membresia.
 - Restriccion de relaciones y registros segun acceso visible.
 
-
 ## Stack tecnologico
 
 - Python 3.14
 - Django 6
 - SQLite en desarrollo
 - PostgreSQL en produccion via `DATABASE_URL`
-- HTML + templates de Django
+- HTML con templates de Django
 - CSS propio
 
 Dependencias principales:
@@ -120,10 +114,8 @@ Dependencias principales:
 
 ## Arquitectura general
 
-El proyecto sigue una estructura clasica de Django:
-
 - `config/`: configuracion principal del proyecto.
-- `app/`: dominio principal de producto, modelos, formularios, vistas y rutas.
+- `app/`: dominio principal, modelos, formularios, vistas y rutas.
 - `templates/`: interfaz renderizada del lado servidor.
 - `static/`: estilos y assets.
 
@@ -131,7 +123,7 @@ Entidades principales:
 
 - `AppDatabase`: representa una base o lista creada por el usuario.
 - `DatabaseMembership`: define acceso y rol sobre cada base.
-- `CustomField`: modela los campos configurables de una base.
+- `CustomField`: modela los campos configurables.
 - `Record`: representa cada registro cargado.
 - `SavedView`: guarda filtros y modos de vista por usuario.
 
@@ -160,26 +152,49 @@ Para produccion:
 
 ## Instalacion local
 
-### 1. Crear y activar el entorno virtual
+### 1. Crear el entorno virtual
 
-```bash
+```powershell
 python -m venv .venv
-.venv\Scripts\activate
 ```
 
-### 2. Instalar dependencias
+### 2. Activarlo
 
-```bash
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Si PowerShell bloquea la activacion por politica de ejecucion, puedes habilitar scripts para tu usuario:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Y luego volver a ejecutar:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Si prefieres no activar el entorno, puedes usar directamente el ejecutable del entorno virtual:
+
+```powershell
+.\.venv\Scripts\python manage.py runserver
+```
+
+### 3. Instalar dependencias
+
+```powershell
 pip install -r requirements.txt
 ```
 
-### 3. Configurar variables de entorno
+### 4. Configurar variables de entorno
 
-Puedes usar `.env.example` como referencia.
+Puedes usar `.env.example` como referencia. El proyecto lee automaticamente un archivo `.env` en la raiz si existe.
 
-Variables recomendadas:
+Configuracion recomendada para desarrollo local:
 
-```bash
+```env
 DJANGO_SECRET_KEY=replace-with-a-long-random-secret
 DJANGO_DEBUG=True
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,testserver
@@ -188,21 +203,27 @@ DJANGO_DEFAULT_FROM_EMAIL=no-reply@easierdatabases.local
 DJANGO_EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 ```
 
+Notas importantes:
+
+- Para desarrollo normal, `DJANGO_DEBUG=True` es lo recomendado.
+- Con `python manage.py runserver`, EasierDataBases desactiva automaticamente la redireccion SSL local.
+- El servidor local debe abrirse con `http://127.0.0.1:8000/`.
+
 Ejemplo para PostgreSQL:
 
-```bash
+```env
 DATABASE_URL=postgresql://usuario:clave@localhost:5432/easierdatabases
 ```
 
-### 4. Aplicar migraciones
+### 5. Aplicar migraciones
 
-```bash
+```powershell
 python manage.py migrate
 ```
 
-### 5. Ejecutar el servidor
+### 6. Ejecutar el servidor
 
-```bash
+```powershell
 python manage.py runserver
 ```
 
@@ -210,29 +231,31 @@ La app quedara disponible en:
 
 - [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
+Si el navegador intenta abrir `https://127.0.0.1:8000/`, escribe manualmente `http://127.0.0.1:8000/` o prueba en una ventana privada.
+
 ## Comandos utiles
 
 Ejecutar tests:
 
-```bash
+```powershell
 python manage.py test
 ```
 
 Chequeo de deploy:
 
-```bash
+```powershell
 python manage.py check --deploy
 ```
 
 Crear superusuario:
 
-```bash
+```powershell
 python manage.py createsuperuser
 ```
 
 Recolectar archivos estaticos:
 
-```bash
+```powershell
 python manage.py collectstatic
 ```
 
@@ -243,6 +266,7 @@ python manage.py collectstatic
 - `DJANGO_DEBUG=True`
 - `DATABASE_URL=sqlite:///db.sqlite3`
 - backend de email por consola
+- `runserver` funciona por HTTP local sin redireccion forzada a HTTPS
 
 ### Produccion
 
@@ -291,6 +315,29 @@ Esto permite separar:
 - importacion/exportacion,
 - administracion basica del equipo.
 
+## Cobertura actual de tests
+
+La suite automatizada cubre flujos centrales del MVP, incluyendo:
+
+- creacion de bases con wizard,
+- creacion y edicion de registros,
+- plantillas iniciales,
+- importacion y exportacion CSV,
+- relaciones entre bases,
+- relaciones bidireccionales,
+- edicion de campos,
+- renombre seguro de campos,
+- importaciones de mas de 50 filas,
+- restricciones de acceso en relaciones,
+- bloqueo de borrado de campos con datos.
+
+## Criterios de calidad ya validados
+
+Actualmente el proyecto pasa:
+
+- `python manage.py test`
+- `python manage.py check --deploy`
+
 ## Limitaciones actuales
 
 El producto todavia no incluye:
@@ -303,3 +350,14 @@ El producto todavia no incluye:
 - auditoria detallada de cambios,
 - permisos por campo o por accion fina,
 - organizaciones/workspaces de nivel enterprise.
+
+## Roadmap recomendado
+
+Siguientes pasos naturales:
+
+1. Introducir `workspace` u `organization` como frontera SaaS explicita.
+2. Agregar auditoria e historial de cambios.
+3. Mejorar importacion con reporte descargable de errores.
+4. Sumar relaciones mas ricas y vistas conectadas.
+5. Incorporar automatizaciones simples.
+6. Avanzar hacia onboarding asistido mas inteligente.

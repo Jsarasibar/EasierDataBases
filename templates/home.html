@@ -3,33 +3,230 @@
 {% block title %}Plataforma no-code para bases simples{% endblock %}
 
 {% block content %}
-<section class="hero">
-    <div class="hero-copy">
-        <span class="eyebrow">Plataforma visual y generalista</span>
-        <h1>Organiza cualquier tipo de informacion sin pelearte con Excel ni aprender sistemas complejos.</h1>
+<section class="landing-hero">
+    <div class="hero-copy landing-hero-copy">
+        <span class="eyebrow">Plataforma no-code para organizar informacion</span>
+        <h1>Organiza tu informacion sin complicarte</h1>
         <p>
-            Crea una base visual, define tus propios campos y administra registros con filtros,
-            prioridades y roles basicos. Puedes empezar con productos, alumnos, clientes o una
-            estructura general y luego adaptarla a tu negocio.
+            EasierDataBases es una plataforma no-code que te permite crear y gestionar bases de datos de forma simple,
+            sin programar ni depender de planillas desordenadas.
         </p>
         <div class="hero-actions">
-            <a class="button" href="{% url 'register' %}">Probar el MVP</a>
+            <a class="button" href="{% url 'register' %}">Empezar gratis</a>
+            <a class="button subtle" href="#como-funciona">Ver como funciona</a>
+        </div>
+        <div class="landing-mini-proof">
+            <span class="tag">Sin codigo</span>
+            <span class="tag">Con plantillas</span>
+            <span class="tag">Listo para uso real</span>
+        </div>
+    </div>
+    <aside class="landing-hero-side">
+        <article class="landing-showcase">
+            <div class="landing-showcase-head">
+                <strong>Lo que puedes resolver hoy</strong>
+                <span class="pill is-active">Simple y estructurado</span>
+            </div>
+            <div class="landing-showcase-grid">
+                <div class="mini-stat">
+                    <strong>Productos</strong>
+                    <span>Stock, precios y catalogos</span>
+                </div>
+                <div class="mini-stat">
+                    <strong>Clientes</strong>
+                    <span>Contactos, seguimiento y pedidos</span>
+                </div>
+                <div class="mini-stat">
+                    <strong>Alumnos</strong>
+                    <span>Cursos, fechas y estados</span>
+                </div>
+                <div class="mini-stat">
+                    <strong>Listas propias</strong>
+                    <span>Cualquier operacion personalizada</span>
+                </div>
+            </div>
+        </article>
+    </aside>
+</section>
+
+<section class="landing-section">
+    <div class="panel-head">
+        <span class="eyebrow">Problema</span>
+        <h2>¿Te pasa esto?</h2>
+    </div>
+    <div class="landing-grid cols-2">
+        <article class="landing-card accent-danger">
+            <ul class="landing-list">
+                <li>Usas Excel y todo termina desordenado.</li>
+                <li>Perdes tiempo buscando informacion.</li>
+                <li>Tienes datos duplicados o inconsistentes.</li>
+                <li>Los sistemas existentes son demasiado complejos.</li>
+            </ul>
+        </article>
+        <article class="landing-card accent-dark">
+            <p class="landing-emphasis">Administrar informacion no deberia ser complicado.</p>
+            <p>
+                Muchas veces el problema no es la falta de datos, sino la dificultad para mantenerlos claros,
+                consistentes y faciles de usar en el dia a dia.
+            </p>
+        </article>
+    </div>
+</section>
+
+<section class="landing-section">
+    <div class="panel-head">
+        <span class="eyebrow">Solucion</span>
+        <h2>Una forma simple de ordenar tu informacion</h2>
+        <p>
+            Con EasierDataBases puedes crear tus propias bases de datos visualmente y gestionarlas sin conocimientos tecnicos.
+        </p>
+    </div>
+    <div class="landing-grid cols-5">
+        <article class="landing-card compact"><strong>Productos</strong></article>
+        <article class="landing-card compact"><strong>Alumnos</strong></article>
+        <article class="landing-card compact"><strong>Clientes</strong></article>
+        <article class="landing-card compact"><strong>Pedidos</strong></article>
+        <article class="landing-card compact"><strong>Cualquier lista personalizada</strong></article>
+    </div>
+</section>
+
+<section class="landing-section">
+    <div class="panel-head">
+        <span class="eyebrow">Capacidades</span>
+        <h2>Crea y gestiona tus datos en minutos</h2>
+    </div>
+    <div class="landing-grid cols-3">
+        <article class="landing-card">
+            <strong>Crear bases</strong>
+            <p>Empieza desde cero o usando plantillas listas para trabajar.</p>
+        </article>
+        <article class="landing-card">
+            <strong>Definir campos</strong>
+            <p>Agrega columnas personalizadas segun tu necesidad real.</p>
+        </article>
+        <article class="landing-card">
+            <strong>Gestionar registros</strong>
+            <p>Carga, edita y elimina informacion sin tocar codigo.</p>
+        </article>
+        <article class="landing-card">
+            <strong>Buscar y filtrar</strong>
+            <p>Encuentra rapido lo importante y ordena mejor el trabajo diario.</p>
+        </article>
+        <article class="landing-card">
+            <strong>Relacionar bases</strong>
+            <p>Conecta clientes con pedidos, alumnos con cursos o cualquier flujo similar.</p>
+        </article>
+        <article class="landing-card">
+            <strong>Importar y exportar CSV</strong>
+            <p>Trae datos desde planillas y vuelve a sacarlos cuando lo necesites.</p>
+        </article>
+    </div>
+</section>
+
+<section class="landing-section landing-band">
+    <div class="landing-grid cols-2 aligned">
+        <article class="landing-card accent-primary">
+            <span class="eyebrow">Propuesta de valor</span>
+            <h2>Simplicidad con estructura</h2>
+            <p>
+                EasierDataBases combina lo mejor de dos mundos: la facilidad de una planilla y la organizacion
+                de un sistema estructurado.
+            </p>
+            <p>Sin necesidad de aprender herramientas complejas.</p>
+        </article>
+        <article class="landing-card">
+            <div class="comparison-stack">
+                <div class="comparison-item">
+                    <strong>La facilidad de una planilla</strong>
+                    <span>Arranque rapido, carga simple y uso intuitivo.</span>
+                </div>
+                <div class="comparison-item">
+                    <strong>La organizacion de un sistema</strong>
+                    <span>Campos definidos, relaciones, roles, filtros y estructura consistente.</span>
+                </div>
+            </div>
+        </article>
+    </div>
+</section>
+
+<section class="landing-section" id="como-funciona">
+    <div class="panel-head">
+        <span class="eyebrow">Como funciona</span>
+        <h2>Un flujo simple en 3 pasos</h2>
+    </div>
+    <div class="landing-steps">
+        <article class="landing-step">
+            <span class="landing-step-number">1</span>
+            <strong>Creas una base</strong>
+            <p>Arrancas desde cero o usando una plantilla.</p>
+        </article>
+        <article class="landing-step">
+            <span class="landing-step-number">2</span>
+            <strong>Defines los campos</strong>
+            <p>Agregas exactamente la informacion que necesitas guardar.</p>
+        </article>
+        <article class="landing-step">
+            <span class="landing-step-number">3</span>
+            <strong>Empiezas a gestionarla</strong>
+            <p>Cargas, buscas, filtras y conectas datos desde una misma interfaz.</p>
+        </article>
+    </div>
+</section>
+
+<section class="landing-section">
+    <div class="panel-head">
+        <span class="eyebrow">Funcionalidades destacadas</span>
+        <h2>Pensado para uso real, todos los dias</h2>
+    </div>
+    <div class="landing-grid cols-3">
+        <article class="landing-card"><strong>Creacion guiada paso a paso</strong><p>Un asistente reduce la complejidad inicial.</p></article>
+        <article class="landing-card"><strong>Plantillas listas para usar</strong><p>Empieza con productos, alumnos, clientes o una base general.</p></article>
+        <article class="landing-card"><strong>Edicion visual de campos y relaciones</strong><p>Personaliza la estructura sin codigo.</p></article>
+        <article class="landing-card"><strong>Carga manual o importacion CSV</strong><p>Elige la forma mas rapida de empezar.</p></article>
+        <article class="landing-card"><strong>Busqueda, filtros, prioridades y paginacion</strong><p>Trabaja con datos reales sin perder orden.</p></article>
+        <article class="landing-card"><strong>Vistas guardadas</strong><p>Reutiliza filtros frecuentes con un clic.</p></article>
+        <article class="landing-card"><strong>Modo simple o avanzado</strong><p>Adapta la interfaz a tu nivel de uso.</p></article>
+        <article class="landing-card"><strong>Navegacion entre registros relacionados</strong><p>Sigue la informacion sin salir del flujo.</p></article>
+        <article class="landing-card"><strong>Trabajo colaborativo con roles</strong><p>Administra y edita con permisos basicos por base.</p></article>
+    </div>
+</section>
+
+<section class="landing-section">
+    <div class="landing-grid cols-2 aligned">
+        <article class="landing-card">
+            <span class="eyebrow">Para quien es</span>
+            <h2>Ideal para</h2>
+            <ul class="landing-list">
+                <li>Pequenos negocios</li>
+                <li>Emprendimientos</li>
+                <li>Equipos administrativos</li>
+                <li>Personas que quieren ordenarse sin programar</li>
+            </ul>
+        </article>
+        <article class="landing-card accent-dark">
+            <span class="eyebrow">Diferencial</span>
+            <h2>¿Por que no usar Excel u otro sistema?</h2>
+            <ul class="landing-list">
+                <li>Es mas ordenado que una planilla.</li>
+                <li>Es mas simple que un sistema complejo.</li>
+                <li>Esta pensado para usuarios no tecnicos.</li>
+                <li>Te guia en todo el proceso.</li>
+            </ul>
+        </article>
+    </div>
+</section>
+
+<section class="landing-section landing-final-cta">
+    <article class="landing-card accent-primary">
+        <span class="eyebrow">Empeza hoy</span>
+        <h2>Empeza a ordenar tu informacion hoy</h2>
+        <p>
+            Crea tu primera base de datos en minutos y deja de depender de planillas desordenadas.
+        </p>
+        <div class="hero-actions">
+            <a class="button" href="{% url 'register' %}">Empezar ahora</a>
             <a class="button subtle" href="{% url 'login' %}">Ya tengo cuenta</a>
         </div>
-    </div>
-    <div class="hero-card">
-        <div class="metric">
-            <strong>Sin codigo</strong>
-            <span>La estructura de datos se define con formularios visuales.</span>
-        </div>
-        <div class="metric">
-            <strong>Plantillas de arranque</strong>
-            <span>Empieza rapido con productos, alumnos, clientes o una base general.</span>
-        </div>
-        <div class="metric">
-            <strong>Extensible</strong>
-            <span>La estructura se adapta a cualquier operacion simple que un negocio necesite gestionar.</span>
-        </div>
-    </div>
+    </article>
 </section>
 {% endblock %}
