@@ -14,12 +14,15 @@ from django.db.models.functions import Cast
 from django.http import Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_exempt
 
 from .forms import CSVImportForm, CSVMappingForm, CustomFieldForm, MembershipForm, RecordForm, RegisterForm, SaveViewForm, WizardOptionsForm, WizardSetupForm, WizardTemplateForm
-from .models import AppDatabase, CustomField, DatabaseMembership, Record, SavedView
+from .models import AppDatabase, CustomField, DatabaseActivity, DatabaseMembership, Record, SavedView
 
 logger = logging.getLogger(__name__)
+
+DETAIL_TABS = {"summary", "daily", "records", "structure", "manage", "history"}
 
 
 SUGGESTED_EXTRA_FIELDS = {
@@ -148,6 +151,64 @@ def _cleanup_import_file(file_path):
     path = Path(file_path)
     if path.exists():
         path.unlink()
+
+
+def _database_tab_url(database, tab):
+    return f"{reverse('database_detail', args=[database.slug])}?tab={tab}"
+
+
+def _log_database_activity(database, actor, action, detail, payload=None):
+    DatabaseActivity.objects.create(
+        database=database,
+        actor=actor if getattr(actor, "pk", None) else None,
+        action=action,
+        detail=detail[:220],
+        payload=payload or {},
+    )
+
+
+def _serialize_value_for_history(database, field_key, value):
+    if value in ("", None, False):
+        return "-"
+    field = database.fields.filter(key=field_key).first()
+    if not field:
+        return str(value)
+    if field.field_type == CustomField.FieldType.BOOLEAN:
+        return "Si" if bool(value) else "No"
+    if field.field_type == CustomField.FieldType.RELATION and field.relation_database:
+        related_record, relation_error = _resolve_related_record(field, value)
+        if related_record:
+            return related_record.title
+        return relation_error or f"ID {value}"
+    return str(value)
+
+
+def _record_changes_for_history(database, previous_data, new_data):
+    changes = []
+    for field in database.fields.all():
+        before = _serialize_value_for_history(database, field.key, (previous_data or {}).get(field.key, ""))
+        after = _serialize_value_for_history(database, field.key, (new_data or {}).get(field.key, ""))
+        if before != after:
+            changes.append(
+                {
+                    "label": field.label,
+                    "before": before,
+                    "after": after,
+                }
+            )
+    return changes
+
+
+def _history_payload_for_activity(activity):
+    payload = activity.payload or {}
+    return {
+        "action": activity.action,
+        "detail": activity.detail,
+        "actor": activity.actor.username if activity.actor else "Sistema",
+        "created_at": activity.created_at.strftime("%d/%m/%Y %H:%M"),
+        "summary": payload.get("summary", []),
+        "changes": payload.get("changes", []),
+    }
 
 
 DEMO_RECORDS = {
@@ -293,6 +354,41 @@ def _template_use_case(template_key):
     return mapping.get(template_key, AppDatabase.UseCase.GENERIC)
 
 
+def _preview_template_fields(templates_catalog, template_key):
+    return next((item["fields"] for item in templates_catalog if item["key"] == template_key), [])
+
+
+def _wizard_render_context(
+    *,
+    templates_catalog,
+    step,
+    wizard_state,
+    assistant,
+    template_form,
+    setup_form,
+    options_form,
+):
+    template_key = wizard_state["starter_template"]
+    return {
+        "templates_catalog": templates_catalog,
+        "step": step,
+        "wizard_state": wizard_state,
+        "assistant": assistant,
+        "template_form": template_form,
+        "setup_form": setup_form,
+        "options_form": options_form,
+        "preview_template_fields": _preview_template_fields(templates_catalog, template_key),
+        "field_option_catalog": _field_option_catalog(template_key),
+        "base_field_keys": _base_field_keys(template_key),
+        "preview_extras": [
+            EXTRA_FIELD_DEFINITIONS[key][0]
+            for key in wizard_state["selected_fields"]
+            if key in EXTRA_FIELD_DEFINITIONS
+        ],
+        "preview_manual_fields": wizard_state["custom_fields"],
+    }
+
+
 def _create_extra_fields(database, selected_extra_keys):
     created_fields = []
     max_position = database.fields.count()
@@ -420,6 +516,23 @@ def _sync_record_titles_for_field(database, primary_field):
             record.save(update_fields=["title", "updated_at"])
             updated += 1
     return updated
+
+
+def _set_primary_field(database, custom_field):
+    custom_field.is_primary = True
+    custom_field.save(update_fields=["is_primary"])
+    return _sync_record_titles_for_field(database, custom_field)
+
+
+def _filter_records_queryset(records, *, query="", record_id="", priority="", has_priority=False):
+    if record_id.isdigit():
+        records = records.filter(pk=int(record_id))
+    if query:
+        id_query = Q(pk=int(query)) if query.isdigit() else Q()
+        records = records.filter(id_query | Q(title__icontains=query) | Q(data_text__icontains=query))
+    if priority and has_priority:
+        records = records.filter(priority=priority)
+    return records
 
 
 def _load_demo_records(database, user, template_key):
@@ -555,24 +668,15 @@ def database_create(request):
             return render(
                 request,
                 "database_create.html",
-                {
-                    "templates_catalog": templates_catalog,
-                    "step": "3",
-                    "wizard_state": wizard_state,
-                    "assistant": assistant,
-                    "template_form": template_form,
-                    "setup_form": setup_form,
-                    "options_form": options_form,
-                    "preview_template_fields": next((item["fields"] for item in templates_catalog if item["key"] == template_key), []),
-                    "field_option_catalog": _field_option_catalog(template_key),
-                    "base_field_keys": _base_field_keys(template_key),
-                    "preview_extras": [
-                        EXTRA_FIELD_DEFINITIONS[key][0]
-                        for key in wizard_state["selected_fields"]
-                        if key in EXTRA_FIELD_DEFINITIONS
-                    ],
-                    "preview_manual_fields": wizard_state["custom_fields"],
-                },
+                _wizard_render_context(
+                    templates_catalog=templates_catalog,
+                    step="3",
+                    wizard_state=wizard_state,
+                    assistant=assistant,
+                    template_form=template_form,
+                    setup_form=setup_form,
+                    options_form=options_form,
+                ),
             )
         if step == "1" and template_form.is_valid():
             cleaned = template_form.cleaned_data
@@ -623,29 +727,32 @@ def database_create(request):
             _create_manual_fields(database, wizard_state["custom_fields"])
             if wizard_state["load_demo_data"]:
                 _load_demo_records(database, request.user, selected_template)
+            _log_database_activity(
+                database,
+                request.user,
+                "Base creada",
+                "Se creo la base y quedo lista para empezar a trabajar.",
+                payload={
+                    "summary": [
+                        {"label": "Base", "value": database.name},
+                        {"label": "Tipo inicial", "value": database.get_use_case_display()},
+                    ]
+                },
+            )
             messages.success(request, "La lista fue creada. El asistente te dejo una base lista para empezar.")
-            return redirect(f"/bases/{database.slug}/?tab=daily")
+            return redirect(_database_tab_url(database, "daily"))
     return render(
         request,
         "database_create.html",
-        {
-            "templates_catalog": templates_catalog,
-            "step": step,
-            "wizard_state": wizard_state,
-            "assistant": assistant,
-            "template_form": template_form,
-            "setup_form": setup_form,
-            "options_form": options_form,
-            "preview_template_fields": next((item["fields"] for item in templates_catalog if item["key"] == template_key), []),
-            "field_option_catalog": _field_option_catalog(template_key),
-            "base_field_keys": _base_field_keys(template_key),
-            "preview_extras": [
-                EXTRA_FIELD_DEFINITIONS[key][0]
-                for key in wizard_state["selected_fields"]
-                if key in EXTRA_FIELD_DEFINITIONS
-            ],
-            "preview_manual_fields": wizard_state["custom_fields"],
-        },
+        _wizard_render_context(
+            templates_catalog=templates_catalog,
+            step=step,
+            wizard_state=wizard_state,
+            assistant=assistant,
+            template_form=template_form,
+            setup_form=setup_form,
+            options_form=options_form,
+        ),
     )
 
 
@@ -654,7 +761,7 @@ def database_detail(request, slug):
     database, membership = _get_database_for_user(request.user, slug)
     primary_field = database.get_primary_field()
     active_tab = request.GET.get("tab", "records")
-    if active_tab not in {"summary", "daily", "records", "structure", "manage"}:
+    if active_tab not in DETAIL_TABS:
         active_tab = "records"
     saved_view_id = request.GET.get("saved_view")
     q = request.GET.get("q", "").strip()
@@ -672,14 +779,13 @@ def database_detail(request, slug):
     if database.has_priority:
         sort_map["priority"] = "priority"
 
-    records = database.records.all().annotate(data_text=Cast("data", output_field=TextField()))
-    if record_id.isdigit():
-        records = records.filter(pk=int(record_id))
-    if q:
-        id_query = Q(pk=int(q)) if q.isdigit() else Q()
-        records = records.filter(id_query | Q(title__icontains=q) | Q(data_text__icontains=q))
-    if priority and database.has_priority:
-        records = records.filter(priority=priority)
+    records = _filter_records_queryset(
+        database.records.all().annotate(data_text=Cast("data", output_field=TextField())),
+        query=q,
+        record_id=record_id,
+        priority=priority,
+        has_priority=database.has_priority,
+    )
     if saved_view_id:
         saved_view = database.saved_views.filter(user=request.user, pk=saved_view_id).first()
         if saved_view:
@@ -687,14 +793,13 @@ def database_detail(request, slug):
             priority = saved_view.priority if database.has_priority else ""
             sort = saved_view.sort
             view_mode = saved_view.view_mode
-            records = database.records.all().annotate(data_text=Cast("data", output_field=TextField()))
-            if record_id.isdigit():
-                records = records.filter(pk=int(record_id))
-            if q:
-                id_query = Q(pk=int(q)) if q.isdigit() else Q()
-                records = records.filter(id_query | Q(title__icontains=q) | Q(data_text__icontains=q))
-            if priority and database.has_priority:
-                records = records.filter(priority=priority)
+            records = _filter_records_queryset(
+                database.records.all().annotate(data_text=Cast("data", output_field=TextField())),
+                query=q,
+                record_id=record_id,
+                priority=priority,
+                has_priority=database.has_priority,
+            )
     records = records.order_by(sort_map.get(sort, "-updated_at"))
     paginator = Paginator(records, 20)
     page_obj = paginator.get_page(request.GET.get("page") or 1)
@@ -736,6 +841,15 @@ def database_detail(request, slug):
         else database.records.all()[:8]
     )
     import_summary = request.session.pop(_import_session_key(database) + "_summary", None)
+    history_page = Paginator(database.activities.select_related("actor"), 25).get_page(request.GET.get("history_page") or 1)
+    history_payloads = {str(item.pk): _history_payload_for_activity(item) for item in history_page.object_list}
+    recent_activities = database.activities.all()
+    today = timezone.localdate()
+    history_stats = {
+        "total": recent_activities.count(),
+        "today": recent_activities.filter(created_at__date=today).count(),
+        "actors": recent_activities.exclude(actor=None).values("actor").distinct().count(),
+    }
 
     context = {
         "database": database,
@@ -774,9 +888,10 @@ def database_detail(request, slug):
         "field_form": CustomFieldForm(database=database, actor=request.user),
         "member_form": MembershipForm(database=database),
         "import_form": CSVImportForm(database=database),
-        "save_view_form": SaveViewForm(),
-        "saved_views": database.saved_views.filter(user=request.user),
         "import_summary": import_summary,
+        "history_page": history_page,
+        "history_payloads": history_payloads,
+        "history_stats": history_stats,
     }
     return render(request, "database_detail.html", context)
 
@@ -865,11 +980,23 @@ def field_create(request, slug):
 
     form = CustomFieldForm(database, request.POST or None, actor=request.user)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        field = form.save()
+        _log_database_activity(
+            database,
+            request.user,
+            "Campo agregado",
+            f"Se agrego el campo {field.label}.",
+            payload={
+                "summary": [
+                    {"label": "Campo", "value": field.label},
+                    {"label": "Tipo", "value": field.get_field_type_display()},
+                ]
+            },
+        )
         messages.success(request, "El campo fue agregado.")
     else:
         messages.error(request, "Revisa los datos del campo.")
-    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
+    return redirect(_database_tab_url(database, "structure"))
 
 
 @login_required
@@ -879,13 +1006,27 @@ def field_update(request, slug, field_id):
         return HttpResponseForbidden("Solo los administradores pueden editar campos.")
 
     custom_field = get_object_or_404(database.fields, pk=field_id)
+    previous_label = custom_field.label
+    previous_type = custom_field.get_field_type_display()
     form = CustomFieldForm(database, request.POST or None, actor=request.user, instance=custom_field)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        updated_field = form.save()
+        _log_database_activity(
+            database,
+            request.user,
+            "Campo editado",
+            f"Se actualizo el campo {updated_field.label}.",
+            payload={
+                "changes": [
+                    {"label": "Nombre", "before": previous_label, "after": updated_field.label},
+                    {"label": "Tipo", "before": previous_type, "after": updated_field.get_field_type_display()},
+                ]
+            },
+        )
         messages.success(request, f"El campo {custom_field.label} fue actualizado.")
     else:
         messages.error(request, "No se pudo actualizar el campo.")
-    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
+    return redirect(_database_tab_url(database, "structure"))
 
 
 @login_required
@@ -898,9 +1039,18 @@ def field_set_primary_select(request, slug):
         selected_field_id = request.POST.get("primary_field_id", "").strip()
         custom_field = database.fields.filter(pk=selected_field_id).first()
         if custom_field:
-            custom_field.is_primary = True
-            custom_field.save(update_fields=["is_primary"])
-            synced = _sync_record_titles_for_field(database, custom_field)
+            synced = _set_primary_field(database, custom_field)
+            _log_database_activity(
+                database,
+                request.user,
+                "Columna principal actualizada",
+                f"{custom_field.label} ahora identifica el nombre visible de los registros.",
+                payload={
+                    "summary": [
+                        {"label": "Nueva columna principal", "value": custom_field.label},
+                    ]
+                },
+            )
             if synced:
                 messages.success(
                     request,
@@ -910,7 +1060,7 @@ def field_set_primary_select(request, slug):
                 messages.success(request, f"{custom_field.label} ahora define el nombre visible del registro.")
         else:
             messages.error(request, "No se encontro el campo seleccionado para el registro.")
-    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
+    return redirect(_database_tab_url(database, "structure"))
 
 
 @login_required
@@ -921,9 +1071,18 @@ def field_set_primary(request, slug, field_id):
 
     custom_field = get_object_or_404(database.fields, pk=field_id)
     if request.method == "POST":
-        custom_field.is_primary = True
-        custom_field.save(update_fields=["is_primary"])
-        synced = _sync_record_titles_for_field(database, custom_field)
+        synced = _set_primary_field(database, custom_field)
+        _log_database_activity(
+            database,
+            request.user,
+            "Columna principal actualizada",
+            f"{custom_field.label} ahora identifica el nombre visible de los registros.",
+            payload={
+                "summary": [
+                    {"label": "Nueva columna principal", "value": custom_field.label},
+                ]
+            },
+        )
         if synced:
             messages.success(
                 request,
@@ -931,7 +1090,7 @@ def field_set_primary(request, slug, field_id):
             )
         else:
             messages.success(request, f"{custom_field.label} ahora define el nombre visible del registro.")
-    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
+    return redirect(_database_tab_url(database, "structure"))
 
 
 @login_required
@@ -947,18 +1106,23 @@ def field_delete(request, slug, field_id):
                 request,
                 f"No se puede eliminar {custom_field.label} porque ya tiene datos cargados. Vacia o migra esos registros primero.",
             )
-            return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
+            return redirect(_database_tab_url(database, "structure"))
         field_name = custom_field.label
         was_primary = custom_field.is_primary
         custom_field.delete()
+        _log_database_activity(
+            database,
+            request.user,
+            "Campo eliminado",
+            f"Se elimino el campo {field_name}.",
+            payload={"summary": [{"label": "Campo eliminado", "value": field_name}]},
+        )
         if was_primary:
             next_field = database.fields.order_by("position", "id").first()
             if next_field:
-                next_field.is_primary = True
-                next_field.save(update_fields=["is_primary"])
-                _sync_record_titles_for_field(database, next_field)
+                _set_primary_field(database, next_field)
         messages.success(request, f"El campo {field_name} fue eliminado.")
-    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
+    return redirect(_database_tab_url(database, "structure"))
 
 
 @login_required
@@ -969,7 +1133,19 @@ def member_create(request, slug):
 
     form = MembershipForm(database, request.POST or None)
     if request.method == "POST" and form.is_valid():
-        form.save()
+        membership = form.save()
+        _log_database_activity(
+            database,
+            request.user,
+            "Permisos actualizados",
+            f"{membership.user.username} quedo con rol {membership.get_role_display().lower()}.",
+            payload={
+                "summary": [
+                    {"label": "Usuario", "value": membership.user.username},
+                    {"label": "Rol", "value": membership.get_role_display()},
+                ]
+            },
+        )
         messages.success(request, "El rol fue actualizado.")
     else:
         messages.error(request, "No se pudo actualizar el miembro.")
@@ -983,6 +1159,18 @@ def record_create(request, slug):
     form = RecordForm(database, request.POST or None, actor=request.user)
     if request.method == "POST" and form.is_valid():
         record = form.save(user=request.user)
+        _log_database_activity(
+            database,
+            request.user,
+            "Registro agregado",
+            f"Se creo el registro {record.title}.",
+            payload={
+                "summary": [
+                    {"label": "Registro", "value": record.title},
+                    {"label": "ID", "value": str(record.pk)},
+                ]
+            },
+        )
         if request.GET.get("popup") == "1" and request.GET.get("relation_field"):
             return render(
                 request,
@@ -1063,9 +1251,36 @@ def record_detail(request, slug, pk):
 def record_edit(request, slug, pk):
     database, membership = _get_database_for_user(request.user, slug)
     record = get_object_or_404(database.records, pk=pk)
+    previous_title = record.title
+    previous_data = dict(record.data or {})
+    previous_priority = record.priority
     form = RecordForm(database, request.POST or None, record=record, actor=request.user)
     if request.method == "POST" and form.is_valid():
-        form.save(user=request.user)
+        updated_record = form.save(user=request.user)
+        changes = _record_changes_for_history(database, previous_data, updated_record.data)
+        if database.has_priority and previous_priority != updated_record.priority:
+            changes.append(
+                {
+                    "label": "Prioridad",
+                    "before": dict(Record.Priority.choices).get(previous_priority, previous_priority),
+                    "after": updated_record.get_priority_display(),
+                }
+            )
+        if previous_title != updated_record.title:
+            changes.insert(0, {"label": "Nombre visible", "before": previous_title, "after": updated_record.title})
+        _log_database_activity(
+            database,
+            request.user,
+            "Registro editado",
+            f"Se actualizo el registro {updated_record.title}.",
+            payload={
+                "summary": [
+                    {"label": "Registro", "value": updated_record.title},
+                    {"label": "ID", "value": str(updated_record.pk)},
+                ],
+                "changes": changes,
+            },
+        )
         messages.success(request, "Registro actualizado.")
         return redirect("database_detail", slug=database.slug)
     return render(
@@ -1080,7 +1295,15 @@ def record_delete(request, slug, pk):
     database, membership = _get_database_for_user(request.user, slug)
     record = get_object_or_404(database.records, pk=pk)
     if request.method == "POST":
+        record_title = record.title
         record.delete()
+        _log_database_activity(
+            database,
+            request.user,
+            "Registro eliminado",
+            f"Se elimino el registro {record_title}.",
+            payload={"summary": [{"label": "Registro eliminado", "value": record_title}]},
+        )
         messages.success(request, "Registro eliminado.")
         return redirect("database_detail", slug=database.slug)
     return render(
@@ -1228,6 +1451,18 @@ def records_import_map(request, slug):
             "total_rows": total_rows,
         }
         request.session[session_key + "_summary"] = summary
+        _log_database_activity(
+            database,
+            request.user,
+            "Importacion CSV",
+            f"Se importaron {imported} filas y se omitieron {skipped} desde un archivo CSV.",
+            payload={
+                "summary": [
+                    {"label": "Filas importadas", "value": str(imported)},
+                    {"label": "Filas omitidas", "value": str(skipped)},
+                ]
+            },
+        )
         messages.success(request, f"Se importaron {imported} de {total_rows} filas usando el mapeo guiado.")
         if skipped:
             messages.error(request, f"Se omitieron {skipped} filas por errores de validacion.")
@@ -1259,6 +1494,13 @@ def error_500(request):
 @login_required
 def records_export(request, slug):
     database, membership = _get_database_for_user(request.user, slug)
+    _log_database_activity(
+        database,
+        request.user,
+        "Exportacion CSV",
+        "Se exporto la base completa en formato CSV.",
+        payload={"summary": [{"label": "Formato", "value": "CSV"}]},
+    )
     response = HttpResponse(content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{database.slug}.csv"'
     response.write("\ufeff")

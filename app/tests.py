@@ -5,7 +5,7 @@ from django.urls import reverse
 import json
 
 from .forms import CustomFieldForm
-from .models import AppDatabase, CustomField, DatabaseMembership, Record
+from .models import AppDatabase, CustomField, DatabaseActivity, DatabaseMembership, Record
 from .views import _base_field_keys
 
 
@@ -194,6 +194,99 @@ class DatabaseFlowTests(TestCase):
         record = database.records.get()
         self.assertEqual(record.title, "Cafe molido")
         self.assertEqual(record.data["precio"], "1500")
+        self.assertTrue(
+            DatabaseActivity.objects.filter(
+                database=database,
+                action="Registro agregado",
+                detail__icontains="Cafe molido",
+            ).exists()
+        )
+
+    def test_history_tab_shows_logged_movements(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(
+            name="Base con historial",
+            slug="base-con-historial",
+            created_by=self.user,
+        )
+        DatabaseMembership.objects.create(
+            database=database,
+            user=self.user,
+            role=DatabaseMembership.Role.ADMIN,
+        )
+        DatabaseActivity.objects.create(
+            database=database,
+            actor=self.user,
+            action="Registro agregado",
+            detail="Se creo el registro Cliente A.",
+        )
+
+        response = self.client.get(reverse("database_detail", args=[database.slug]), {"tab": "history"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Historial de la base")
+        self.assertContains(response, "Registro agregado")
+        self.assertContains(response, "Cliente A")
+        self.assertContains(response, "admin")
+
+    def test_record_edit_activity_stores_before_and_after_changes(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(
+            name="Productos historial",
+            slug="productos-historial",
+            created_by=self.user,
+            has_priority=True,
+        )
+        DatabaseMembership.objects.create(
+            database=database,
+            user=self.user,
+            role=DatabaseMembership.Role.ADMIN,
+        )
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            required=True,
+            position=1,
+            is_primary=True,
+        )
+        CustomField.objects.create(
+            database=database,
+            label="Stock",
+            key="stock",
+            field_type=CustomField.FieldType.NUMBER,
+            required=False,
+            position=2,
+        )
+        record = Record.objects.create(
+            database=database,
+            title="Cafe",
+            priority=Record.Priority.NORMAL,
+            data={"nombre": "Cafe", "stock": "10"},
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("record_edit", args=[database.slug, record.pk]),
+            {
+                "nombre": "Cafe premium",
+                "stock": "15",
+                "priority": Record.Priority.HIGH,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        activity = DatabaseActivity.objects.filter(database=database, action="Registro editado").latest("created_at")
+        self.assertEqual(activity.payload["summary"][0]["value"], "Cafe premium")
+        changes = {item["label"]: item for item in activity.payload["changes"]}
+        self.assertEqual(changes["Nombre"]["before"], "Cafe")
+        self.assertEqual(changes["Nombre"]["after"], "Cafe premium")
+        self.assertEqual(changes["Stock"]["before"], "10")
+        self.assertEqual(changes["Stock"]["after"], "15")
+        self.assertEqual(changes["Prioridad"]["before"], "Normal")
+        self.assertEqual(changes["Prioridad"]["after"], "Alta")
 
     def test_create_record_without_priority_uses_primary_field_as_title(self):
         self.client.login(username="admin", password="secret123")

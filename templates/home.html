@@ -3,13 +3,12 @@
 {% block title %}Plataforma no-code para bases simples{% endblock %}
 
 {% block content %}
-<section class="landing-hero">
+<section class="landing-hero landing-hero-enhanced">
     <div class="hero-copy landing-hero-copy">
-        <span class="eyebrow">Plataforma no-code para organizar informacion</span>
-        <h1>Organiza tu informacion sin complicarte</h1>
-        <p>
-            EasierDataBases es una plataforma no-code que te permite crear y gestionar bases de datos de forma simple,
-            sin programar ni depender de planillas desordenadas.
+        <span class="eyebrow">Plataforma no-code para organizar información</span>
+        <h1>Organiza tu información sin complicarte</h1>
+        <p class="landing-lead">
+            EasierDataBases te permite crear y gestionar bases de datos visuales sin programar, con la flexibilidad de una planilla y la estructura de un sistema pensado para trabajar todos los dias.
         </p>
         <div class="hero-actions">
             <a class="button" href="{% url 'register' %}">Empezar gratis</a>
@@ -18,31 +17,79 @@
         <div class="landing-mini-proof">
             <span class="tag">Sin codigo</span>
             <span class="tag">Con plantillas</span>
-            <span class="tag">Listo para uso real</span>
+            <span class="tag">Relaciones entre bases</span>
+            <span class="tag">Importacion CSV</span>
+        </div>
+        <div class="landing-proof-strip">
+            <div>
+                <strong>En minutos</strong>
+                <span>Creas una base y empiezas a cargar datos.</span>
+            </div>
+            <div>
+                <strong>Sin curva tecnica</strong>
+                <span>Pensado para personas que no quieren complicarse en sistemas complejos.</span>
+            </div>
         </div>
     </div>
     <aside class="landing-hero-side">
-        <article class="landing-showcase">
+        <article class="landing-showcase landing-product-glimpse">
             <div class="landing-showcase-head">
-                <strong>Lo que puedes resolver hoy</strong>
-                <span class="pill is-active">Simple y estructurado</span>
+                <div>
+                    <strong>Vista de trabajo real</strong>
+                    <p>Una base simple, ordenada y lista para operar.</p>
+                </div>
+                <span class="pill is-active">Demo operativa</span>
+            </div>
+            <div class="landing-window-bar">
+                <span></span><span></span><span></span>
+            </div>
+            <div class="landing-preview-tabs">
+                <span class="pill is-active">Registros</span>
+                <span class="pill">Trabajo diario</span>
+                <span class="pill">Estructura</span>
+            </div>
+            <div class="landing-preview-table">
+                <div class="landing-preview-row landing-preview-head">
+                    <span>ID</span>
+                    <span>Registro</span>
+                    <span>Estado</span>
+                    <span>Relacion</span>
+                </div>
+                <div class="landing-preview-row">
+                    <span>#18</span>
+                    <span>Cafe molido</span>
+                    <span><b>Activo</b></span>
+                    <span>Proveedor Norte</span>
+                </div>
+                <div class="landing-preview-row">
+                    <span>#21</span>
+                    <span>Pedido Abril</span>
+                    <span><b>Urgente</b></span>
+                    <span>Cliente Acme</span>
+                </div>
+                <div class="landing-preview-row">
+                    <span>#22</span>
+                    <span>Alumno Lucia</span>
+                    <span><b>Regular</b></span>
+                    <span>Curso Excel</span>
+                </div>
             </div>
             <div class="landing-showcase-grid">
                 <div class="mini-stat">
-                    <strong>Productos</strong>
-                    <span>Stock, precios y catalogos</span>
+                    <strong>Plantillas</strong>
+                    <span>Productos, alumnos, clientes y mas</span>
                 </div>
                 <div class="mini-stat">
-                    <strong>Clientes</strong>
-                    <span>Contactos, seguimiento y pedidos</span>
+                    <strong>Campos</strong>
+                    <span>Texto, fecha, seleccion, relacion y mas</span>
                 </div>
                 <div class="mini-stat">
-                    <strong>Alumnos</strong>
-                    <span>Cursos, fechas y estados</span>
+                    <strong>Operacion</strong>
+                    <span>Buscar, filtrar, importar y editar</span>
                 </div>
                 <div class="mini-stat">
-                    <strong>Listas propias</strong>
-                    <span>Cualquier operacion personalizada</span>
+                    <strong>Colaboracion</strong>
+                    <span>Roles de admin y editor</span>
                 </div>
             </div>
         </article>
@@ -52,22 +99,22 @@
 <section class="landing-section">
     <div class="panel-head">
         <span class="eyebrow">Problema</span>
-        <h2>¿Te pasa esto?</h2>
+        <h2>Tu información existe, pero trabajar con ella sigue siendo un dolor</h2>
+        <p>Cuando la operacion depende de planillas o de sistemas sobredimensionados, lo que mas se pierde es tiempo y claridad.</p>
     </div>
     <div class="landing-grid cols-2">
         <article class="landing-card accent-danger">
             <ul class="landing-list">
                 <li>Usas Excel y todo termina desordenado.</li>
-                <li>Perdes tiempo buscando informacion.</li>
+                <li>Perdes tiempo buscando información.</li>
                 <li>Tienes datos duplicados o inconsistentes.</li>
                 <li>Los sistemas existentes son demasiado complejos.</li>
             </ul>
         </article>
         <article class="landing-card accent-dark">
-            <p class="landing-emphasis">Administrar informacion no deberia ser complicado.</p>
+            <p class="landing-emphasis">Administrar información no deberia sentirse como mantener un sistema entero.</p>
             <p>
-                Muchas veces el problema no es la falta de datos, sino la dificultad para mantenerlos claros,
-                consistentes y faciles de usar en el dia a dia.
+                Lo ideal es poder crear una base clara, adaptarla a tu trabajo y usarla todos los dias sin depender de una herramienta tecnica ni de una planilla caotica.
             </p>
         </article>
     </div>
@@ -75,10 +122,10 @@
 
 <section class="landing-section">
     <div class="panel-head">
-        <span class="eyebrow">Solucion</span>
-        <h2>Una forma simple de ordenar tu informacion</h2>
+        <span class="eyebrow">Solución</span>
+        <h2>Una forma simple de ordenar tu información</h2>
         <p>
-            Con EasierDataBases puedes crear tus propias bases de datos visualmente y gestionarlas sin conocimientos tecnicos.
+            Con EasierDataBases puedes crear tus propias bases de datos visualmente, definir su estructura y operarlas desde una sola interfaz sin conocimientos tecnicos.
         </p>
     </div>
     <div class="landing-grid cols-5">
@@ -86,13 +133,13 @@
         <article class="landing-card compact"><strong>Alumnos</strong></article>
         <article class="landing-card compact"><strong>Clientes</strong></article>
         <article class="landing-card compact"><strong>Pedidos</strong></article>
-        <article class="landing-card compact"><strong>Cualquier lista personalizada</strong></article>
+        <article class="landing-card compact"><strong>Cualquier base personalizada</strong></article>
     </div>
 </section>
 
 <section class="landing-section">
     <div class="panel-head">
-        <span class="eyebrow">Capacidades</span>
+        <span class="eyebrow">Que puedes hacer</span>
         <h2>Crea y gestiona tus datos en minutos</h2>
     </div>
     <div class="landing-grid cols-3">
@@ -102,15 +149,15 @@
         </article>
         <article class="landing-card">
             <strong>Definir campos</strong>
-            <p>Agrega columnas personalizadas segun tu necesidad real.</p>
+            <p>Agrega columnas personalizadas segun tu necesidad real y elige cual identifica al registro.</p>
         </article>
         <article class="landing-card">
             <strong>Gestionar registros</strong>
-            <p>Carga, edita y elimina informacion sin tocar codigo.</p>
+            <p>Carga, edita y elimina información sin tocar codigo.</p>
         </article>
         <article class="landing-card">
             <strong>Buscar y filtrar</strong>
-            <p>Encuentra rapido lo importante y ordena mejor el trabajo diario.</p>
+            <p>Encuentra rapido lo importante por contenido, ID, orden o prioridad.</p>
         </article>
         <article class="landing-card">
             <strong>Relacionar bases</strong>
@@ -129,8 +176,7 @@
             <span class="eyebrow">Propuesta de valor</span>
             <h2>Simplicidad con estructura</h2>
             <p>
-                EasierDataBases combina lo mejor de dos mundos: la facilidad de una planilla y la organizacion
-                de un sistema estructurado.
+                EasierDataBases combina lo mejor de dos mundos: la facilidad de una planilla y la organizacion de un sistema estructurado.
             </p>
             <p>Sin necesidad de aprender herramientas complejas.</p>
         </article>
@@ -138,11 +184,11 @@
             <div class="comparison-stack">
                 <div class="comparison-item">
                     <strong>La facilidad de una planilla</strong>
-                    <span>Arranque rapido, carga simple y uso intuitivo.</span>
+                    <span>Arranque rapido, carga simple y decisiones guiadas.</span>
                 </div>
                 <div class="comparison-item">
                     <strong>La organizacion de un sistema</strong>
-                    <span>Campos definidos, relaciones, roles, filtros y estructura consistente.</span>
+                    <span>Campos definidos, relaciones, permisos, historial y estructura consistente.</span>
                 </div>
             </div>
         </article>
@@ -158,17 +204,17 @@
         <article class="landing-step">
             <span class="landing-step-number">1</span>
             <strong>Creas una base</strong>
-            <p>Arrancas desde cero o usando una plantilla.</p>
+            <p>Arrancas desde cero o usando una plantilla que ya te da estructura inicial.</p>
         </article>
         <article class="landing-step">
             <span class="landing-step-number">2</span>
             <strong>Defines los campos</strong>
-            <p>Agregas exactamente la informacion que necesitas guardar.</p>
+            <p>Agregas exactamente la información que necesitas guardar y decides como se relaciona.</p>
         </article>
         <article class="landing-step">
             <span class="landing-step-number">3</span>
             <strong>Empiezas a gestionarla</strong>
-            <p>Cargas, buscas, filtras y conectas datos desde una misma interfaz.</p>
+            <p>Cargas, buscas, filtras, importas y conectas datos desde una misma interfaz.</p>
         </article>
     </div>
 </section>
@@ -179,14 +225,14 @@
         <h2>Pensado para uso real, todos los dias</h2>
     </div>
     <div class="landing-grid cols-3">
-        <article class="landing-card"><strong>Creacion guiada paso a paso</strong><p>Un asistente reduce la complejidad inicial.</p></article>
+        <article class="landing-card"><strong>Creacion guiada paso a paso</strong><p>Un asistente reduce la complejidad inicial y deja la base lista para arrancar.</p></article>
         <article class="landing-card"><strong>Plantillas listas para usar</strong><p>Empieza con productos, alumnos, clientes o una base general.</p></article>
         <article class="landing-card"><strong>Edicion visual de campos y relaciones</strong><p>Personaliza la estructura sin codigo.</p></article>
         <article class="landing-card"><strong>Carga manual o importacion CSV</strong><p>Elige la forma mas rapida de empezar.</p></article>
         <article class="landing-card"><strong>Busqueda, filtros, prioridades y paginacion</strong><p>Trabaja con datos reales sin perder orden.</p></article>
-        <article class="landing-card"><strong>Vistas guardadas</strong><p>Reutiliza filtros frecuentes con un clic.</p></article>
-        <article class="landing-card"><strong>Modo simple o avanzado</strong><p>Adapta la interfaz a tu nivel de uso.</p></article>
-        <article class="landing-card"><strong>Navegacion entre registros relacionados</strong><p>Sigue la informacion sin salir del flujo.</p></article>
+        <article class="landing-card"><strong>Historial por base</strong><p>Consulta que se hizo, quien lo hizo y cuando ocurrio.</p></article>
+        <article class="landing-card"><strong>Creacion inline de relacionados</strong><p>Agrega un cliente, proveedor o curso sin salir del formulario actual.</p></article>
+        <article class="landing-card"><strong>Navegacion entre registros relacionados</strong><p>Sigue la información sin salir del flujo.</p></article>
         <article class="landing-card"><strong>Trabajo colaborativo con roles</strong><p>Administra y edita con permisos basicos por base.</p></article>
     </div>
 </section>
@@ -205,21 +251,46 @@
         </article>
         <article class="landing-card accent-dark">
             <span class="eyebrow">Diferencial</span>
-            <h2>¿Por que no usar Excel u otro sistema?</h2>
+            <h2>Por que no usar Excel u otro sistema</h2>
             <ul class="landing-list">
                 <li>Es mas ordenado que una planilla.</li>
                 <li>Es mas simple que un sistema complejo.</li>
                 <li>Esta pensado para usuarios no tecnicos.</li>
-                <li>Te guia en todo el proceso.</li>
+                <li>Te guia en todo el proceso y sigue siendo flexible.</li>
             </ul>
         </article>
     </div>
 </section>
 
+<section class="landing-section">
+    <div class="panel-head">
+        <span class="eyebrow">Preguntas comunes</span>
+        <h2>Lo esencial antes de empezar</h2>
+    </div>
+    <div class="landing-grid cols-2">
+        <article class="landing-card">
+            <strong>Necesito saber de bases de datos o programacion</strong>
+            <p>No. EasierDataBases esta pensado justamente para personas que quieren ordenar información sin meterse en complejidad tecnica.</p>
+        </article>
+        <article class="landing-card">
+            <strong>Puedo empezar con una plantilla y cambiarla despues</strong>
+            <p>Si. Puedes agregar campos, editar estructura, activar relaciones y ajustar la base a medida que entiendes mejor tu proceso.</p>
+        </article>
+        <article class="landing-card">
+            <strong>Sirve solo para productos o inventario</strong>
+            <p>No. Ese es solo un caso de arranque. La plataforma esta pensada para cualquier base operativa simple.</p>
+        </article>
+        <article class="landing-card">
+            <strong>Puedo traer mis datos desde Excel</strong>
+            <p>Si. Puedes importar CSV con mapeo guiado y luego seguir trabajando dentro de EasierDataBases.</p>
+        </article>
+    </div>
+</section>
+
 <section class="landing-section landing-final-cta">
-    <article class="landing-card accent-primary">
+    <article class="landing-card accent-primary landing-final-card">
         <span class="eyebrow">Empeza hoy</span>
-        <h2>Empeza a ordenar tu informacion hoy</h2>
+        <h2>Empeza a ordenar tu información hoy</h2>
         <p>
             Crea tu primera base de datos en minutos y deja de depender de planillas desordenadas.
         </p>

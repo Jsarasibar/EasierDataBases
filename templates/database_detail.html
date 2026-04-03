@@ -22,6 +22,7 @@
     <a class="tab-link {% if active_tab == 'summary' %}is-current{% endif %}" href="?tab=summary">Resumen</a>
     <a class="tab-link {% if active_tab == 'structure' %}is-current{% endif %}" href="?tab=structure">Estructura</a>
     <a class="tab-link {% if active_tab == 'manage' %}is-current{% endif %}" href="?tab=manage">Gestion</a>
+    <a class="tab-link {% if active_tab == 'history' %}is-current{% endif %}" href="?tab=history">Historial</a>
 </section>
 
 {% if active_tab == 'summary' %}
@@ -347,6 +348,145 @@
             });
 
             document.querySelectorAll("[data-related-preview-close]").forEach((item) => {
+                item.addEventListener("click", closePreview);
+            });
+        })();
+    </script>
+{% endif %}
+
+{% if active_tab == 'history' %}
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Historial de la base</h2>
+            <p>Aqui veras los movimientos realizados, quien los hizo y cuando ocurrieron.</p>
+        </div>
+        <section class="stats-grid">
+            <article class="stat-card"><strong>{{ history_stats.total }}</strong><span>Movimientos totales</span></article>
+            <article class="stat-card"><strong>{{ history_stats.today }}</strong><span>Hechos hoy</span></article>
+            <article class="stat-card"><strong>{{ history_stats.actors }}</strong><span>Usuarios con actividad</span></article>
+        </section>
+        {% if history_page.object_list %}
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Movimiento</th>
+                            <th>Detalle</th>
+                            <th>Usuario</th>
+                            <th>Fecha</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in history_page.object_list %}
+                            <tr>
+                                <td><strong>{{ item.action }}</strong></td>
+                                <td>{{ item.detail }}</td>
+                                <td>{{ item.actor.username|default:"Sistema" }}</td>
+                                <td>{{ item.created_at|date:"d/m/Y H:i" }}</td>
+                                <td class="actions">
+                                    <button type="button" class="button subtle history-detail-trigger" data-history-activity-id="{{ item.pk }}">Ver detalle</button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if history_page.paginator.num_pages > 1 %}
+                <div class="pagination">
+                    {% if history_page.has_previous %}
+                        <a class="button subtle" href="?tab=history&history_page={{ history_page.previous_page_number }}">Anterior</a>
+                    {% endif %}
+                    <span class="pill is-active">Pagina {{ history_page.number }} de {{ history_page.paginator.num_pages }}</span>
+                    {% if history_page.has_next %}
+                        <a class="button subtle" href="?tab=history&history_page={{ history_page.next_page_number }}">Siguiente</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="empty-state">
+                <h3>Todavia no hay movimientos registrados</h3>
+                <p>Cuando se agreguen, editen o importen datos, el historial empezara a completarse aqui.</p>
+            </div>
+        {% endif %}
+    </section>
+    <div class="related-preview-card" id="history-preview-card" hidden>
+        <div class="related-preview-backdrop" data-history-preview-close></div>
+        <div class="related-preview-panel history-preview-panel">
+            <div class="member-row">
+                <div>
+                    <span class="eyebrow" id="history-preview-date">Movimiento</span>
+                    <h3 id="history-preview-title">Detalle del movimiento</h3>
+                </div>
+                <button type="button" class="modal-close-button" aria-label="Cerrar" data-history-preview-close>X</button>
+            </div>
+            <p class="history-preview-description" id="history-preview-description"></p>
+            <div class="record-meta" id="history-preview-summary"></div>
+            <div class="history-change-list" id="history-preview-changes"></div>
+        </div>
+    </div>
+    {{ history_payloads|json_script:"history-activity-data" }}
+    <script>
+        (() => {
+            const payloadNode = document.getElementById("history-activity-data");
+            const historyPayloads = payloadNode ? JSON.parse(payloadNode.textContent) : {};
+            const triggers = Array.from(document.querySelectorAll("[data-history-activity-id]"));
+            const previewCard = document.getElementById("history-preview-card");
+            if (!triggers.length || !previewCard) {
+                return;
+            }
+            const previewDate = document.getElementById("history-preview-date");
+            const previewTitle = document.getElementById("history-preview-title");
+            const previewDescription = document.getElementById("history-preview-description");
+            const previewSummary = document.getElementById("history-preview-summary");
+            const previewChanges = document.getElementById("history-preview-changes");
+
+            const closePreview = () => {
+                previewCard.hidden = true;
+            };
+
+            triggers.forEach((trigger) => {
+                trigger.addEventListener("click", () => {
+                    const payload = historyPayloads[trigger.dataset.historyActivityId];
+                    if (!payload) {
+                        return;
+                    }
+                    previewDate.textContent = `${payload.actor} · ${payload.created_at}`;
+                    previewTitle.textContent = payload.action || "Movimiento";
+                    previewDescription.textContent = payload.detail || "";
+                    previewSummary.innerHTML = "";
+                    previewChanges.innerHTML = "";
+
+                    (payload.summary || []).forEach((item) => {
+                        const row = document.createElement("div");
+                        row.className = "record-meta-row";
+                        row.innerHTML = `<span>${item.label}</span><strong>${item.value}</strong>`;
+                        previewSummary.appendChild(row);
+                    });
+
+                    if ((payload.changes || []).length) {
+                        const title = document.createElement("h4");
+                        title.textContent = "Cambios";
+                        previewChanges.appendChild(title);
+                        payload.changes.forEach((item) => {
+                            const block = document.createElement("article");
+                            block.className = "history-change-card";
+                            block.innerHTML = `
+                                <strong>${item.label}</strong>
+                                <div class="history-change-values">
+                                    <span><small>Antes</small><b>${item.before}</b></span>
+                                    <span><small>Ahora</small><b>${item.after}</b></span>
+                                </div>
+                            `;
+                            previewChanges.appendChild(block);
+                        });
+                    }
+
+                    previewCard.hidden = false;
+                });
+            });
+
+            document.querySelectorAll("[data-history-preview-close]").forEach((item) => {
                 item.addEventListener("click", closePreview);
             });
         })();

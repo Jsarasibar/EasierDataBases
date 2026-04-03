@@ -39,49 +39,6 @@ class RegisterForm(UserCreationForm):
         fields = ("username", "first_name", "email")
 
 
-class DatabaseForm(forms.ModelForm):
-    starter_template = forms.ChoiceField(
-        label="Plantilla inicial",
-        initial="inventory",
-        choices=(
-            ("inventory", "Productos / Inventario"),
-            ("students", "Alumnos / Cursos"),
-            ("clients", "Clientes / Contactos"),
-            ("generic", "Otra / General"),
-            ("blank", "Empezar desde cero"),
-        ),
-        help_text="Te da una estructura inicial editable. Luego podes agregar, quitar o cambiar campos.",
-    )
-    suggested_fields = forms.MultipleChoiceField(
-        label="Campos sugeridos opcionales",
-        required=False,
-        widget=forms.CheckboxSelectMultiple,
-    )
-    load_demo_data = forms.BooleanField(
-        label="Cargar ejemplos para entender la base",
-        required=False,
-        initial=True,
-    )
-
-    class Meta:
-        model = AppDatabase
-        fields = ("name", "description", "use_case")
-        labels = {
-            "name": "Nombre de la base",
-            "description": "Descripcion",
-            "use_case": "Caso de uso inicial",
-        }
-        widgets = {
-            "description": forms.Textarea(attrs={"rows": 3}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        suggested_choices = kwargs.pop("suggested_choices", ())
-        super().__init__(*args, **kwargs)
-        self.fields["suggested_fields"].choices = suggested_choices
-        self.fields["suggested_fields"].help_text = "Selecciona extras utiles para arrancar sin pensar toda la estructura."
-
-
 class WizardTemplateForm(forms.Form):
     starter_template = forms.ChoiceField(
         label="Plantilla inicial",
