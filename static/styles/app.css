@@ -146,7 +146,7 @@ textarea,
 }
 
 .brand {
-    font-size: 1.05rem;
+    font-size: 1.45rem;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -1758,6 +1758,17 @@ html[data-theme="dark"] .landing-preview-head {
     background: linear-gradient(180deg, #28415b 0%, #1e3347 100%);
 }
 
+html[data-theme="dark"] .tab-strip {
+    background: linear-gradient(180deg, #1b2a3b 0%, #152231 100%);
+    border-color: #6f8397;
+}
+
+html[data-theme="dark"] .tab-link {
+    background: linear-gradient(180deg, #25384c 0%, #1a2b3b 100%);
+    border-color: #60778d;
+    color: #e7eff8;
+}
+
 html[data-theme="dark"] th {
     background: #0f1823;
     color: var(--text);
@@ -1765,6 +1776,18 @@ html[data-theme="dark"] th {
 
 html[data-theme="dark"] td {
     background: rgba(15, 24, 35, 0.48);
+}
+
+html[data-theme="dark"] tbody tr {
+    background: #162434;
+}
+
+html[data-theme="dark"] tbody tr:nth-child(even) {
+    background: #1b2a3b;
+}
+
+html[data-theme="dark"] tbody tr:hover {
+    background: #24364a;
 }
 
 html[data-theme="dark"] .modal-close-button,
@@ -1814,4 +1837,33 @@ html[data-theme="dark"] .empty-state {
 
 html[data-theme="dark"] .message {
     background: linear-gradient(180deg, #192838 0%, #121d2a 100%);
+}
+
+html[data-theme="dark"] .button:hover,
+html[data-theme="dark"] .link-button:hover,
+html[data-theme="dark"] .tab-link:hover,
+html[data-theme="dark"] .field-delete-button:hover,
+html[data-theme="dark"] .theme-toggle:hover {
+    color: #ffffff;
+}
+
+html[data-theme="dark"] .template-option:hover .template-option-body,
+html[data-theme="dark"] .record-card:hover,
+html[data-theme="dark"] .database-card:hover,
+html[data-theme="dark"] .field-card:hover,
+html[data-theme="dark"] .mini-stat:hover,
+html[data-theme="dark"] .stat-card:hover {
+    background: linear-gradient(180deg, #24364a 0%, #192939 100%);
+    color: var(--text);
+}
+
+html[data-theme="dark"] .button.subtle:hover,
+html[data-theme="dark"] .link-button:hover {
+    background: linear-gradient(180deg, #3a536c 0%, #294055 100%);
+    color: #ffffff;
+}
+
+html[data-theme="dark"] .tab-link:hover {
+    background: linear-gradient(180deg, #34506a 0%, #263b50 100%);
+    color: #ffffff;
 }
