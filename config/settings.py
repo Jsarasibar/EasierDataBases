@@ -3,6 +3,7 @@ Django settings for config project.
 """
 
 import os
+import socket
 import sys
 from pathlib import Path
 
@@ -31,6 +32,19 @@ def env_bool(name, default=False):
     return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def local_network_hosts():
+    hosts = {"localhost", "127.0.0.1", "testserver"}
+    try:
+        hosts.add(socket.gethostname())
+        hosts.add(socket.getfqdn())
+        for item in socket.gethostbyname_ex(socket.gethostname())[2]:
+            if item:
+                hosts.add(item)
+    except OSError:
+        pass
+    return sorted(host for host in hosts if host and host != "0.0.0.0")
+
+
 SECRET_KEY = os.getenv(
     "DJANGO_SECRET_KEY",
     "vqt@3m#s9y!6f5p1k2b7c8n0r4x6l1w8z3u5t7q9n2m4y6a8b0c",
@@ -39,7 +53,13 @@ RUNNING_TESTS = "test" in sys.argv
 RUNNING_DEV_SERVER = "runserver" in sys.argv
 LOCAL_DEV = RUNNING_TESTS or RUNNING_DEV_SERVER or env_bool("DJANGO_LOCAL_DEV", False)
 DEBUG = env_bool("DJANGO_DEBUG", LOCAL_DEV)
-ALLOWED_HOSTS = [host.strip() for host in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",") if host.strip()]
+configured_allowed_hosts = [host.strip() for host in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if host.strip()]
+if configured_allowed_hosts:
+    ALLOWED_HOSTS = configured_allowed_hosts
+elif LOCAL_DEV:
+    ALLOWED_HOSTS = local_network_hosts()
+else:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",

@@ -12,9 +12,6 @@
     </div>
     <div class="hero-actions">
         <a class="button" href="{% url 'record_create' database.slug %}">Nuevo registro</a>
-        <a class="button subtle" href="?tab={{ active_tab }}&mode={% if mode == 'basic' %}advanced{% else %}basic{% endif %}">
-            {% if mode == 'basic' %}Ver opciones avanzadas{% else %}Volver a modo simple{% endif %}
-        </a>
         <a class="button subtle" href="{% url 'dashboard' %}">Volver</a>
     </div>
 </section>
@@ -72,55 +69,30 @@
 {% endif %}
 
 {% if active_tab == 'daily' %}
-    <section class="detail-grid">
-        <article class="panel">
-            <div class="panel-head split">
-                <div>
-                    <h2>Trabajo de hoy</h2>
-                    <p>Todo lo importante en un solo lugar para operar sin navegar menus.</p>
+    <section class="panel">
+        <div class="panel-head split">
+            <div>
+                <h2>Trabajo de hoy</h2>
+                <p>Todo lo importante en un solo lugar para operar sin navegar menus.</p>
+            </div>
+            <a class="button" href="{% url 'record_create' database.slug %}">Carga rapida</a>
+        </div>
+        <div class="stack-form compact">
+            {% for record in daily_records %}
+                <a class="database-card" href="{% url 'record_detail' database.slug record.pk %}">
+                    <div class="member-row">
+                        <strong>{{ record.title }}</strong>
+                        <span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span>
+                    </div>
+                    <p>Abre el elemento y continua desde donde lo dejaste.</p>
+                </a>
+            {% empty %}
+                <div class="empty-state">
+                    <h3>No hay urgencias por ahora</h3>
+                    <p>Puedes agregar un nuevo elemento o revisar toda la lista desde Registros.</p>
                 </div>
-                <a class="button" href="{% url 'record_create' database.slug %}">Carga rapida</a>
-            </div>
-            <div class="stack-form compact">
-                {% for record in daily_records %}
-                    <a class="database-card" href="{% url 'record_detail' database.slug record.pk %}">
-                        <div class="member-row">
-                            <strong>{{ record.title }}</strong>
-                            <span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span>
-                        </div>
-                        <p>Abre el elemento y continua desde donde lo dejaste.</p>
-                    </a>
-                {% empty %}
-                    <div class="empty-state">
-                        <h3>No hay urgencias por ahora</h3>
-                        <p>Puedes agregar un nuevo elemento o revisar toda la lista desde Registros.</p>
-                    </div>
-                {% endfor %}
-            </div>
-        </article>
-        <article class="panel">
-            <div class="panel-head">
-                <h2>Formulario simplificado</h2>
-                <p>Asi veras la carga principal en esta base.</p>
-            </div>
-            <div class="stack-form compact">
-                <div class="field">
-                    <span>Nombre principal</span>
-                    <input type="text" value="" placeholder="Ejemplo: Producto, alumno o cliente">
-                </div>
-                {% for field in basic_fields_preview %}
-                    <div class="field">
-                        <span>{{ field.label }}</span>
-                        <input type="text" value="" placeholder="{{ field.help_text|default:'Completa este dato' }}">
-                    </div>
-                {% empty %}
-                    <div class="empty-state">
-                        <h3>Primero arma la estructura</h3>
-                        <p>Agrega columnas en Estructura y aqui apareceran tus campos principales.</p>
-                    </div>
-                {% endfor %}
-            </div>
-        </article>
+            {% endfor %}
+        </div>
     </section>
 {% endif %}
 
@@ -297,7 +269,7 @@
                         <div class="member-row">
                             <div>
                                 <strong>{{ item.field.label }}</strong>
-                                {% if mode == 'advanced' %}<p class="field-key">{{ item.field.key }}</p>{% endif %}
+                                <p class="field-key">{{ item.field.key }}</p>
                             </div>
                             <span class="pill">{{ item.field.get_field_type_display }}</span>
                         </div>
@@ -458,6 +430,25 @@
                     {% endfor %}
                     <button type="submit" class="button">Actualizar miembro</button>
                 </form>
+            {% endif %}
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <h2>Zona sensible</h2>
+                <p>Acciones de alto impacto sobre esta base. Revisa bien antes de continuar.</p>
+            </div>
+            {% if membership.role == 'admin' %}
+                <div class="empty-state danger-zone">
+                    <h3>Eliminar esta base</h3>
+                    <p>Se eliminaran su estructura, registros, vistas guardadas y membresias. Esta accion no se puede deshacer.</p>
+                    <a class="button danger" href="{% url 'database_delete' database.slug %}">Ir a eliminacion segura</a>
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <h3>Solo disponible para administradores</h3>
+                    <p>Necesitas rol de administrador para acceder a las acciones sensibles de esta base.</p>
+                </div>
             {% endif %}
         </article>
     </section>

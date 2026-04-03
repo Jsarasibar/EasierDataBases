@@ -46,7 +46,6 @@ Casos de uso que hoy encajan bien:
   - Desde cero
 - Extras sugeridos por plantilla.
 - Datos demo opcionales.
-- Modo inicial simple o avanzado.
 
 ### Modelado visual de la base
 
@@ -294,7 +293,7 @@ El proyecto ya contempla:
 1. El usuario se registra o inicia sesion.
 2. Crea una nueva base con el asistente.
 3. Elige una plantilla o arranca desde cero.
-4. Ajusta campos sugeridos y carga datos demo si quiere.
+4. Ajusta campos sugeridos, propios y carga datos demo si quiere.
 5. Empieza a operar registros desde la vista diaria o la pestaña de registros.
 6. Si necesita, edita la estructura, agrega relaciones, importa CSV o comparte acceso.
 

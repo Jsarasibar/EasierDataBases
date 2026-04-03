@@ -44,6 +44,7 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("bases/nueva/", views.database_create, name="database_create"),
     path("bases/<slug:slug>/", views.database_detail, name="database_detail"),
+    path("bases/<slug:slug>/eliminar/", views.database_delete, name="database_delete"),
     path("bases/<slug:slug>/vistas/guardar/", views.saved_view_create, name="saved_view_create"),
     path("bases/<slug:slug>/campos/nuevo/", views.field_create, name="field_create"),
     path("bases/<slug:slug>/campos/<int:field_id>/editar/", views.field_update, name="field_update"),

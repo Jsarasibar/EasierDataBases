@@ -69,13 +69,13 @@ Ejemplos:
 Aqui puedes:
 
 - activar campos extra recomendados,
-- cargar ejemplos para entender mejor como funciona,
-- elegir si quieres empezar en modo simple o avanzado.
+- sumar campos propios,
+- cargar ejemplos para entender mejor como funciona.
 
 Si no quieres pensar demasiado al principio, conviene:
 
 - dejar los ejemplos activados,
-- y comenzar en `Modo simple`.
+- y empezar con una estructura chica y clara.
 
 ### Paso 4. Confirmar
 

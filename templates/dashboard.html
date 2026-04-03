@@ -7,7 +7,7 @@
     <div>
         <span class="eyebrow">Centro de inicio</span>
         <h1>Hola, {{ request.user.first_name|default:request.user.username }}</h1>
-        <p>Elige rapido que quieres hacer: crear una lista, seguir tareas del dia o abrir una base existente.</p>
+        <p>Elige que quieres hacer: crear una lista, seguir tareas del dia o abrir una base existente.</p>
     </div>
     <a class="button" href="{% url 'database_create' %}">Nueva base</a>
 </section>
@@ -89,7 +89,7 @@
         {% empty %}
             <div class="empty-state">
                 <h3>Todavia no hay bases creadas</h3>
-                <p>Crea una base de inventario y empieza con campos listos para validar el MVP.</p>
+                <p>Crea tu primera base para comenzar a organizar tu información.</p>
             </div>
         {% endfor %}
     </div>

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Eliminar base{% endblock %}
+
+{% block content %}
+<section class="panel narrow">
+    <div class="panel-head">
+        <span class="eyebrow">Zona sensible</span>
+        <h1>Eliminar base</h1>
+        <p>Esta accion eliminara la base completa, incluyendo campos, registros, vistas guardadas y accesos asociados.</p>
+    </div>
+
+    <div class="empty-state danger-zone">
+        <h3>{{ database.name }}</h3>
+        <p>Para evitar errores, confirma manualmente que realmente quieres borrarla.</p>
+    </div>
+
+    <form method="post" class="stack-form compact top-gap">
+        {% csrf_token %}
+        <label class="field">
+            <span>Escribe el nombre exacto de la base</span>
+            <input type="text" name="confirmation_name" placeholder="{{ database.name }}" required>
+            <small>Debes escribir exactamente: {{ database.name }}</small>
+        </label>
+        <label class="field">
+            <span>Escribe la palabra de confirmacion</span>
+            <input type="text" name="confirmation_phrase" placeholder="{{ expected_phrase }}" required>
+            <small>Escribe: {{ expected_phrase }}</small>
+        </label>
+        <div class="hero-actions">
+            <button type="submit" class="button danger">Eliminar base definitivamente</button>
+            <a class="button subtle" href="{% url 'database_detail' database.slug %}?tab=manage">Cancelar</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

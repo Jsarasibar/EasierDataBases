@@ -7,8 +7,8 @@
     <article class="panel">
         <div class="panel-head">
             <span class="eyebrow">Asistente de creación</span>
-            <h1>Vamos a armar tu lista sin meterte en complejidad técnica.</h1>
-            <p>El asistente te guía, recomienda y te muestra una vista previa. No bloquea decisiones ni fija nada para siempre.</p>
+            <h1>Vamos a armar tu base sin meterte en complejidad técnica.</h1>
+            <p>El asistente te guía, recomienda y te muestra una vista previa.</p>
         </div>
 
         <div class="wizard-steps">
@@ -24,7 +24,7 @@
                 <input type="hidden" name="step" value="1">
                 <div class="field">
                     <span>{{ template_form.starter_template.label }}</span>
-                    <small>El asistente usa esta elección para recomendar nombre, extras y ejemplos. Luego podrás cambiar lo que quieras.</small>
+                    <small>La plantilla define la estructura inicial, las recomendaciones y el tipo de lista. Luego podrás cambiar lo que quieras.</small>
                     <div class="template-selector">
                         {% for template in templates_catalog %}
                             <label class="template-option">
@@ -45,11 +45,6 @@
                     </div>
                     {{ template_form.starter_template.errors }}
                 </div>
-                <label class="field">
-                    <span>{{ template_form.use_case.label }}</span>
-                    {{ template_form.use_case }}
-                    {{ template_form.use_case.errors }}
-                </label>
                 <div class="hero-actions">
                     <button type="submit" class="button">Siguiente</button>
                 </div>
@@ -65,7 +60,7 @@
                 <label class="field">
                     <span>{{ setup_form.name.label }}</span>
                     {{ setup_form.name }}
-                    <small>Consejo del asistente: un nombre simple y reconocible ayuda a encontrar la lista más rápido.</small>
+                    <small>Consejo del asistente: un nombre simple y reconocible ayuda a encontrar la base más rápido.</small>
                     {{ setup_form.name.errors }}
                 </label>
                 <label class="field">
@@ -82,36 +77,150 @@
         {% endif %}
 
         {% if step == '3' %}
-            <form method="post" class="stack-form">
+            <form method="post" class="stack-form" id="wizard-options-form">
                 {% csrf_token %}
                 <input type="hidden" name="step" value="3">
                 <input type="hidden" name="starter_template" value="{{ wizard_state.starter_template }}">
                 <input type="hidden" name="use_case" value="{{ wizard_state.use_case }}">
                 <input type="hidden" name="name" value="{{ wizard_state.name }}">
                 <input type="hidden" name="description" value="{{ wizard_state.description }}">
-                <div class="field">
-                    <span>{{ options_form.suggested_fields.label }}</span>
-                    <small>El asistente marca extras comunes para que no tengas que pensar toda la estructura desde cero.</small>
-                    <div class="checkbox-list">
-                        {{ options_form.suggested_fields }}
+                {{ options_form.custom_fields_json }}
+
+                <div class="wizard-structure-builder">
+                    <div class="field">
+                        <span>{{ options_form.selected_fields.label }}</span>
+                        <small>Los campos propios de la plantilla ya vienen marcados. Puedes desactivar algunos, sumar extras o agregar uno propio con el botón final. Todo esto podrás cambiarlo más adelante.</small>
+                        <div class="field-selection-grid">
+                            {% for checkbox in options_form.selected_fields %}
+                                <label class="field-pick-card {% if checkbox.data.value in base_field_keys %}is-base{% else %}is-extra{% endif %}">
+                                    {{ checkbox.tag }}
+                                    <span class="field-pick-mark"></span>
+                                    <strong>{{ checkbox.choice_label }}</strong>
+                                    {% for item in field_option_catalog %}
+                                        {% if item.key == checkbox.data.value %}
+                                            <small>
+                                                {% if item.kind == 'base' %}Campo base de la plantilla.{% else %}Extra recomendado opcional.{% endif %}
+                                                {{ item.help_text }}
+                                            </small>
+                                        {% endif %}
+                                    {% endfor %}
+                                </label>
+                            {% empty %}
+                                <div class="empty-state">
+                                    <h3>Sin campos sugeridos</h3>
+                                    <p>Esta plantilla no trae estructura base. Puedes crearla desde el botón +.</p>
+                                </div>
+                            {% endfor %}
+                            <button type="button" class="field-pick-card field-pick-add" id="add-custom-field">
+                                <span class="field-pick-plus">+</span>
+                                <strong>Agregar un campo propio</strong>
+                                <small>Suma un campo personalizado ahora mismo y déjalo listo desde la configuración inicial.</small>
+                            </button>
+                        </div>
+                        {{ options_form.selected_fields.errors }}
                     </div>
-                    {{ options_form.suggested_fields.errors }}
+
+                    <div class="manual-field-grid" id="custom-fields-list"></div>
+
+                    <label class="field checkbox-line">
+                        <span>{{ options_form.load_demo_data.label }}</span>
+                        {{ options_form.load_demo_data }}
+                        <small>Los ejemplos sirven para entender cómo se usa la base. Puedes borrarlos después.</small>
+                    </label>
                 </div>
-                <label class="field checkbox-line">
-                    <span>{{ options_form.load_demo_data.label }}</span>
-                    {{ options_form.load_demo_data }}
-                    <small>Los ejemplos sirven para entender cómo se usa la lista. Puedes borrarlos después.</small>
-                </label>
-                <label class="field">
-                    <span>{{ options_form.preferred_mode.label }}</span>
-                    {{ options_form.preferred_mode }}
-                    <small>Modo simple oculta parte de la complejidad y te lleva primero a trabajar.</small>
-                </label>
+
                 <div class="hero-actions">
                     <a class="button subtle" href="?step=2&starter_template={{ wizard_state.starter_template }}&use_case={{ wizard_state.use_case }}&name={{ wizard_state.name|urlencode }}&description={{ wizard_state.description|urlencode }}">Volver</a>
                     <button type="submit" class="button">Ver confirmación</button>
                 </div>
             </form>
+
+            {{ preview_manual_fields|json_script:"wizard-initial-custom-fields" }}
+            <template id="custom-field-template">
+                <div class="manual-field-card" data-custom-field>
+                    <div class="member-row">
+                        <strong>Campo personalizado</strong>
+                        <button type="button" class="field-delete-button" data-remove-custom-field>Quitar</button>
+                    </div>
+                    <label class="field">
+                        <span>Nombre</span>
+                        <input type="text" data-custom-label placeholder="Ejemplo: Proveedor secundario">
+                    </label>
+                    <label class="field">
+                        <span>Tipo</span>
+                        <select data-custom-type>
+                            <option value="text">Texto</option>
+                            <option value="number">Numero</option>
+                            <option value="currency">Moneda</option>
+                            <option value="boolean">Si / No</option>
+                            <option value="date">Fecha</option>
+                            <option value="email">Email</option>
+                            <option value="phone">Telefono</option>
+                            <option value="select">Seleccion</option>
+                        </select>
+                    </label>
+                    <label class="field" data-custom-options-wrapper hidden>
+                        <span>Opciones</span>
+                        <textarea rows="3" data-custom-options placeholder="Una opcion por linea"></textarea>
+                        <small>Solo para campos de selección.</small>
+                    </label>
+                </div>
+            </template>
+            <script>
+                (() => {
+                    const form = document.getElementById("wizard-options-form");
+                    const addButton = document.getElementById("add-custom-field");
+                    const list = document.getElementById("custom-fields-list");
+                    const template = document.getElementById("custom-field-template");
+                    const hiddenInput = document.getElementById("id_custom_fields_json");
+                    const initialFieldsNode = document.getElementById("wizard-initial-custom-fields");
+                    const initialFields = initialFieldsNode ? JSON.parse(initialFieldsNode.textContent) : [];
+
+                    const syncPayload = () => {
+                        const payload = Array.from(list.querySelectorAll("[data-custom-field]")).map((card) => ({
+                            label: card.querySelector("[data-custom-label]").value.trim(),
+                            field_type: card.querySelector("[data-custom-type]").value,
+                            options_text: card.querySelector("[data-custom-options]").value.trim(),
+                        })).filter((item) => item.label || item.field_type || item.options_text);
+                        hiddenInput.value = JSON.stringify(payload);
+                    };
+
+                    const bindCard = (card) => {
+                        const typeInput = card.querySelector("[data-custom-type]");
+                        const optionsWrapper = card.querySelector("[data-custom-options-wrapper]");
+                        const removeButton = card.querySelector("[data-remove-custom-field]");
+                        const updateVisibility = () => {
+                            optionsWrapper.hidden = typeInput.value !== "select";
+                            syncPayload();
+                        };
+                        card.querySelectorAll("input, select, textarea").forEach((input) => {
+                            input.addEventListener("input", syncPayload);
+                            input.addEventListener("change", updateVisibility);
+                        });
+                        removeButton.addEventListener("click", () => {
+                            card.remove();
+                            syncPayload();
+                        });
+                        updateVisibility();
+                    };
+
+                    const addCard = (data = {}) => {
+                        const fragment = template.content.firstElementChild.cloneNode(true);
+                        fragment.querySelector("[data-custom-label]").value = data.label || "";
+                        fragment.querySelector("[data-custom-type]").value = data.field_type || "text";
+                        fragment.querySelector("[data-custom-options]").value = data.options_text || "";
+                        list.appendChild(fragment);
+                        bindCard(fragment);
+                        syncPayload();
+                    };
+
+                    addButton.addEventListener("click", () => addCard());
+                    if (Array.isArray(initialFields)) {
+                        initialFields.forEach((item) => addCard(item));
+                    }
+                    syncPayload();
+                })();
+            </script>
         {% endif %}
 
         {% if step == '4' %}
@@ -122,40 +231,48 @@
                 <input type="hidden" name="use_case" value="{{ wizard_state.use_case }}">
                 <input type="hidden" name="name" value="{{ wizard_state.name }}">
                 <input type="hidden" name="description" value="{{ wizard_state.description }}">
-                {% for item in wizard_state.suggested_fields %}
-                    <input type="hidden" name="suggested_fields" value="{{ item }}">
+                {% for item in wizard_state.selected_fields %}
+                    <input type="hidden" name="selected_fields" value="{{ item }}">
                 {% endfor %}
+                {{ preview_manual_fields|json_script:"wizard-confirm-custom-fields" }}
+                <input type="hidden" name="custom_fields_json" id="wizard-confirm-custom-fields-input">
                 {% if wizard_state.load_demo_data %}<input type="hidden" name="load_demo_data" value="on">{% endif %}
-                <input type="hidden" name="preferred_mode" value="{{ wizard_state.preferred_mode }}">
-
                 <div class="wizard-summary">
                     <div class="record-meta">
                         <div class="record-meta-row"><span>Tipo de lista</span><strong>{{ assistant.suggested_name|default:wizard_state.starter_template }}</strong></div>
                         <div class="record-meta-row"><span>Nombre</span><strong>{{ wizard_state.name }}</strong></div>
-                        <div class="record-meta-row"><span>Modo inicial</span><strong>{% if wizard_state.preferred_mode == 'basic' %}Simple{% else %}Avanzado{% endif %}</strong></div>
                         <div class="record-meta-row"><span>Ejemplos cargados</span><strong>{% if wizard_state.load_demo_data %}Sí{% else %}No{% endif %}</strong></div>
                     </div>
                     <div class="tag-list">
-                        {% for field in preview_template_fields %}
-                            <span class="tag">{{ field }}</span>
+                        {% for item in field_option_catalog %}
+                            {% if item.key in wizard_state.selected_fields %}
+                                <span class="tag">{{ item.label }}</span>
+                            {% endif %}
                         {% endfor %}
-                        {% for field in preview_extras %}
-                            <span class="tag">{{ field }}</span>
+                        {% for field in preview_manual_fields %}
+                            <span class="tag">{{ field.label }}</span>
                         {% endfor %}
                     </div>
                 </div>
                 <div class="hero-actions">
                     <a class="button subtle" href="?step=3&starter_template={{ wizard_state.starter_template }}&use_case={{ wizard_state.use_case }}&name={{ wizard_state.name|urlencode }}&description={{ wizard_state.description|urlencode }}">Volver</a>
-                    <button type="submit" class="button">Crear lista con el asistente</button>
+                    <button type="submit" class="button">Crear base de datos</button>
                 </div>
             </form>
+            <script>
+                (() => {
+                    const sourceNode = document.getElementById("wizard-confirm-custom-fields");
+                    const targetInput = document.getElementById("wizard-confirm-custom-fields-input");
+                    targetInput.value = sourceNode ? sourceNode.textContent : "[]";
+                })();
+            </script>
         {% endif %}
     </article>
 
     <aside class="panel wizard-side">
         <div class="panel-head">
             <h2>Cómo ayuda el asistente</h2>
-            <p>Te acompaña hasta dejar una base inicial lista, pero no invade tus decisiones.</p>
+            <p>Te acompaña hasta dejar una base inicial lista.</p>
         </div>
         <div class="stack-form compact">
             <div class="assistant-note">
@@ -167,12 +284,8 @@
                 <p>Nombre claro, estructura base, extras comunes, ejemplos opcionales y un modo de uso inicial.</p>
             </div>
             <div class="assistant-note">
-                <strong>Hasta dónde se mete</strong>
-                <p>{{ assistant.watchout }}</p>
-            </div>
-            <div class="assistant-note">
-                <strong>Qué no hace</strong>
-                <p>No crea automatizaciones, no decide relaciones complejas por ti y no bloquea cambios posteriores.</p>
+                <strong>Por qué es útil</strong>
+                <p>Te ahorra tiempo, te da una estructura inicial probada y te guía para que puedas enfocarte en lo importante: tu información.</p>
             </div>
         </div>
     </aside>

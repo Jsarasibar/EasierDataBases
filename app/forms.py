@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import uuid
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -87,11 +88,6 @@ class WizardTemplateForm(forms.Form):
             ("blank", "Empezar desde cero"),
         ),
     )
-    use_case = forms.ChoiceField(
-        label="Uso principal",
-        choices=AppDatabase.UseCase.choices,
-        initial=AppDatabase.UseCase.INVENTORY,
-    )
 
 
 class WizardSetupForm(forms.Form):
@@ -104,8 +100,8 @@ class WizardSetupForm(forms.Form):
 
 
 class WizardOptionsForm(forms.Form):
-    suggested_fields = forms.MultipleChoiceField(
-        label="Extras recomendados",
+    selected_fields = forms.MultipleChoiceField(
+        label="Campos iniciales",
         required=False,
         widget=forms.CheckboxSelectMultiple,
     )
@@ -114,19 +110,50 @@ class WizardOptionsForm(forms.Form):
         required=False,
         initial=True,
     )
-    preferred_mode = forms.ChoiceField(
-        label="Como quieres empezar a usarla",
-        choices=(
-            ("basic", "Modo simple"),
-            ("advanced", "Modo avanzado"),
-        ),
-        initial="basic",
-    )
+    custom_fields_json = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     def __init__(self, *args, **kwargs):
-        suggested_choices = kwargs.pop("suggested_choices", ())
+        field_choices = kwargs.pop("field_choices", ())
         super().__init__(*args, **kwargs)
-        self.fields["suggested_fields"].choices = suggested_choices
+        self.fields["selected_fields"].choices = field_choices
+
+    def clean(self):
+        cleaned_data = super().clean()
+        custom_fields = []
+        raw_custom_fields = cleaned_data.get("custom_fields_json") or "[]"
+        try:
+            parsed_custom_fields = json.loads(raw_custom_fields)
+        except json.JSONDecodeError as exc:
+            raise ValidationError("No se pudieron leer los campos personalizados agregados en este paso.") from exc
+
+        if not isinstance(parsed_custom_fields, list):
+            raise ValidationError("El formato de los campos personalizados no es valido.")
+
+        for item in parsed_custom_fields:
+            if not isinstance(item, dict):
+                raise ValidationError("Cada campo personalizado debe tener un formato valido.")
+            label = str(item.get("label", "")).strip()
+            field_type = str(item.get("field_type", "")).strip()
+            options_text = str(item.get("options_text", "")).strip()
+            if not label and not field_type and not options_text:
+                continue
+            if label and not field_type:
+                raise ValidationError("Todos los campos personalizados necesitan un tipo.")
+            if field_type and not label:
+                raise ValidationError("Todos los campos personalizados necesitan un nombre.")
+            if field_type == CustomField.FieldType.SELECT and not options_text:
+                raise ValidationError("Los campos personalizados de seleccion necesitan opciones.")
+            if field_type != CustomField.FieldType.SELECT:
+                options_text = ""
+            custom_fields.append(
+                {
+                    "label": label,
+                    "field_type": field_type,
+                    "options_text": options_text,
+                }
+            )
+        cleaned_data["custom_fields"] = custom_fields
+        return cleaned_data
 
 
 class SaveViewForm(forms.ModelForm):

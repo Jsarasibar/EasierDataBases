@@ -2,6 +2,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+import json
 
 from .forms import CustomFieldForm
 from .models import AppDatabase, CustomField, DatabaseMembership, Record
@@ -23,7 +24,6 @@ class DatabaseFlowTests(TestCase):
         description="Base de prueba",
         suggested_fields=None,
         load_demo_data=False,
-        preferred_mode="basic",
     ):
         suggested_fields = suggested_fields or []
         response = self.client.post(
@@ -48,7 +48,6 @@ class DatabaseFlowTests(TestCase):
             "use_case": use_case,
             "name": name,
             "description": description,
-            "preferred_mode": preferred_mode,
         }
         for field in suggested_fields:
             payload.setdefault("suggested_fields", [])
@@ -63,7 +62,6 @@ class DatabaseFlowTests(TestCase):
             "use_case": use_case,
             "name": name,
             "description": description,
-            "preferred_mode": preferred_mode,
         }
         for field in suggested_fields:
             confirm_payload.setdefault("suggested_fields", [])
@@ -464,6 +462,60 @@ class DatabaseFlowTests(TestCase):
         self.assertEqual(mapping_response.status_code, 302)
         self.assertEqual(database.records.count(), 60)
 
+    def test_creation_wizard_can_add_manual_fields_in_step_three(self):
+        self.client.login(username="admin", password="secret123")
+        self.client.post(
+            reverse("database_create"),
+            {"step": "1", "starter_template": "inventory"},
+        )
+        self.client.post(
+            reverse("database_create"),
+            {
+                "step": "2",
+                "starter_template": "inventory",
+                "use_case": "inventory",
+                "name": "Base con manuales",
+                "description": "Prueba",
+            },
+        )
+        response = self.client.post(
+            reverse("database_create"),
+            {
+                "step": "3",
+                "starter_template": "inventory",
+                "use_case": "inventory",
+                "name": "Base con manuales",
+                "description": "Prueba",
+                "custom_fields_json": json.dumps(
+                    [
+                        {"label": "Proveedor alternativo", "field_type": CustomField.FieldType.TEXT, "options_text": ""},
+                        {"label": "Estado interno", "field_type": CustomField.FieldType.SELECT, "options_text": "Pendiente\nActivo"},
+                    ]
+                ),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        confirm_response = self.client.post(
+            reverse("database_create"),
+            {
+                "step": "4",
+                "starter_template": "inventory",
+                "use_case": "inventory",
+                "name": "Base con manuales",
+                "description": "Prueba",
+                "custom_fields_json": json.dumps(
+                    [
+                        {"label": "Proveedor alternativo", "field_type": CustomField.FieldType.TEXT, "options_text": ""},
+                        {"label": "Estado interno", "field_type": CustomField.FieldType.SELECT, "options_text": "Pendiente\nActivo"},
+                    ]
+                ),
+            },
+        )
+        self.assertEqual(confirm_response.status_code, 302)
+        database = AppDatabase.objects.get(name="Base con manuales")
+        self.assertTrue(database.fields.filter(label="Proveedor alternativo", field_type=CustomField.FieldType.TEXT).exists())
+        self.assertTrue(database.fields.filter(label="Estado interno", field_type=CustomField.FieldType.SELECT).exists())
+
     def test_relation_database_queryset_is_limited_to_accessible_bases(self):
         owner = User.objects.create_user(username="owner", password="secret123")
         visible_db = AppDatabase.objects.create(name="Visible", slug="visible-db", created_by=owner)
@@ -542,3 +594,35 @@ class DatabaseFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertTrue(database.fields.filter(pk=field.pk).exists())
+
+    def test_admin_can_delete_database_with_explicit_confirmation(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base critica", slug="base-critica", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+
+        response = self.client.post(
+            reverse("database_delete", args=[database.slug]),
+            {
+                "confirmation_name": "Base critica",
+                "confirmation_phrase": "ELIMINAR",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AppDatabase.objects.filter(pk=database.pk).exists())
+
+    def test_database_delete_requires_exact_confirmation(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base sensible", slug="base-sensible", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+
+        response = self.client.post(
+            reverse("database_delete", args=[database.slug]),
+            {
+                "confirmation_name": "Base",
+                "confirmation_phrase": "ELIMINAR",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(AppDatabase.objects.filter(pk=database.pk).exists())

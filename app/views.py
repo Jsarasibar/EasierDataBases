@@ -43,6 +43,41 @@ SUGGESTED_EXTRA_FIELDS = {
     ],
 }
 
+STARTER_TEMPLATE_FIELD_DEFINITIONS = {
+    "inventory": [
+        ("inventory_nombre", "Nombre", CustomField.FieldType.TEXT, True, True, "Nombre del producto", ""),
+        ("inventory_sku", "SKU", CustomField.FieldType.TEXT, False, True, "Codigo interno o referencia", ""),
+        ("inventory_precio", "Precio", CustomField.FieldType.CURRENCY, True, True, "Valor de venta", ""),
+        ("inventory_stock", "Stock", CustomField.FieldType.NUMBER, True, True, "Cantidad disponible", ""),
+        ("inventory_categoria", "Categoria", CustomField.FieldType.TEXT, False, True, "Linea o familia del producto", ""),
+        ("inventory_reponer", "Reponer", CustomField.FieldType.BOOLEAN, False, True, "Marca si necesita reposicion", ""),
+    ],
+    "students": [
+        ("students_nombre", "Nombre", CustomField.FieldType.TEXT, True, True, "Nombre completo del alumno", ""),
+        ("students_curso", "Curso", CustomField.FieldType.TEXT, True, True, "Programa o curso asignado", ""),
+        ("students_email", "Email", CustomField.FieldType.EMAIL, False, True, "Contacto principal", ""),
+        ("students_telefono", "Telefono", CustomField.FieldType.PHONE, False, False, "Telefono del alumno", ""),
+        ("students_fecha_inicio", "Fecha de inicio", CustomField.FieldType.DATE, False, True, "Inicio de cursada", ""),
+        ("students_cuota_dia", "Cuota al dia", CustomField.FieldType.BOOLEAN, False, True, "Marca si esta al dia", ""),
+    ],
+    "clients": [
+        ("clients_nombre", "Nombre", CustomField.FieldType.TEXT, True, True, "Nombre del contacto", ""),
+        ("clients_empresa", "Empresa", CustomField.FieldType.TEXT, False, True, "Empresa o razon social", ""),
+        ("clients_email", "Email", CustomField.FieldType.EMAIL, False, True, "Correo de contacto", ""),
+        ("clients_telefono", "Telefono", CustomField.FieldType.PHONE, False, False, "Numero principal", ""),
+        ("clients_ultimo_contacto", "Ultimo contacto", CustomField.FieldType.DATE, False, True, "Fecha del ultimo seguimiento", ""),
+        ("clients_activo", "Activo", CustomField.FieldType.BOOLEAN, False, True, "Cliente activo o prospecto", ""),
+    ],
+    "generic": [
+        ("generic_nombre", "Nombre", CustomField.FieldType.TEXT, True, True, "Nombre principal del registro", ""),
+        ("generic_estado", "Estado", CustomField.FieldType.TEXT, False, True, "Situacion o etapa del registro", ""),
+        ("generic_responsable", "Responsable", CustomField.FieldType.TEXT, False, True, "Persona a cargo", ""),
+        ("generic_fecha_objetivo", "Fecha objetivo", CustomField.FieldType.DATE, False, True, "Fecha estimada", ""),
+        ("generic_importe", "Importe", CustomField.FieldType.CURRENCY, False, True, "Valor economico opcional", ""),
+    ],
+    "blank": [],
+}
+
 
 EXTRA_FIELD_DEFINITIONS = {
     "inventory_supplier": ("Proveedor", CustomField.FieldType.TEXT, False, True, "Proveedor principal"),
@@ -113,96 +148,6 @@ def _cleanup_import_file(file_path):
         path.unlink()
 
 
-def _create_inventory_template(database):
-    default_fields = [
-        ("Nombre", CustomField.FieldType.TEXT, True, True, "Nombre del producto"),
-        ("SKU", CustomField.FieldType.TEXT, False, True, "Codigo interno o referencia"),
-        ("Precio", CustomField.FieldType.CURRENCY, True, True, "Valor de venta"),
-        ("Stock", CustomField.FieldType.NUMBER, True, True, "Cantidad disponible"),
-        ("Categoria", CustomField.FieldType.TEXT, False, True, "Linea o familia del producto"),
-        ("Reponer", CustomField.FieldType.BOOLEAN, False, True, "Marca si necesita reposicion"),
-    ]
-    for position, (label, field_type, required, show_in_table, help_text) in enumerate(default_fields, start=1):
-        CustomField.objects.create(
-            database=database,
-            label=label,
-            field_type=field_type,
-            required=required,
-            show_in_table=show_in_table,
-            help_text=help_text,
-            position=position,
-        )
-
-
-def _create_students_template(database):
-    default_fields = [
-        ("Nombre", CustomField.FieldType.TEXT, True, True, "Nombre completo del alumno"),
-        ("Curso", CustomField.FieldType.TEXT, True, True, "Programa o curso asignado"),
-        ("Email", CustomField.FieldType.EMAIL, False, True, "Contacto principal"),
-        ("Telefono", CustomField.FieldType.PHONE, False, False, "Telefono del alumno"),
-        ("Fecha de inicio", CustomField.FieldType.DATE, False, True, "Inicio de cursada"),
-        ("Cuota al dia", CustomField.FieldType.BOOLEAN, False, True, "Marca si esta al dia"),
-    ]
-    for position, (label, field_type, required, show_in_table, help_text) in enumerate(default_fields, start=1):
-        CustomField.objects.create(
-            database=database,
-            label=label,
-            field_type=field_type,
-            required=required,
-            show_in_table=show_in_table,
-            help_text=help_text,
-            position=position,
-        )
-
-
-def _create_clients_template(database):
-    default_fields = [
-        ("Nombre", CustomField.FieldType.TEXT, True, True, "Nombre del contacto"),
-        ("Empresa", CustomField.FieldType.TEXT, False, True, "Empresa o razon social"),
-        ("Email", CustomField.FieldType.EMAIL, False, True, "Correo de contacto"),
-        ("Telefono", CustomField.FieldType.PHONE, False, False, "Numero principal"),
-        ("Ultimo contacto", CustomField.FieldType.DATE, False, True, "Fecha del ultimo seguimiento"),
-        ("Activo", CustomField.FieldType.BOOLEAN, False, True, "Cliente activo o prospecto"),
-    ]
-    for position, (label, field_type, required, show_in_table, help_text) in enumerate(default_fields, start=1):
-        CustomField.objects.create(
-            database=database,
-            label=label,
-            field_type=field_type,
-            required=required,
-            show_in_table=show_in_table,
-            help_text=help_text,
-            position=position,
-        )
-
-
-def _create_generic_template(database):
-    default_fields = [
-        ("Nombre", CustomField.FieldType.TEXT, True, True, "Nombre principal del registro"),
-        ("Estado", CustomField.FieldType.TEXT, False, True, "Situacion o etapa del registro"),
-        ("Responsable", CustomField.FieldType.TEXT, False, True, "Persona a cargo"),
-        ("Fecha objetivo", CustomField.FieldType.DATE, False, True, "Fecha estimada"),
-        ("Importe", CustomField.FieldType.CURRENCY, False, True, "Valor economico opcional"),
-    ]
-    for position, (label, field_type, required, show_in_table, help_text) in enumerate(default_fields, start=1):
-        CustomField.objects.create(
-            database=database,
-            label=label,
-            field_type=field_type,
-            required=required,
-            show_in_table=show_in_table,
-            help_text=help_text,
-            position=position,
-        )
-
-
-STARTER_TEMPLATES = {
-    "inventory": _create_inventory_template,
-    "students": _create_students_template,
-    "clients": _create_clients_template,
-    "generic": _create_generic_template,
-}
-
 DEMO_RECORDS = {
     "inventory": [
         {"title": "Cafe tostado", "priority": "high", "data": {"nombre": "Cafe tostado", "sku": "CAF-001", "precio": "12500", "stock": "18", "categoria": "Bebidas", "reponer": True}},
@@ -257,25 +202,25 @@ def _template_catalog():
             "key": "inventory",
             "title": "Productos / Inventario",
             "description": "Ideal para stock, catalogos, listas de precios y reposicion.",
-            "fields": ["Nombre", "SKU", "Precio", "Stock", "Categoria", "Reponer"],
+            "fields": [item[1] for item in STARTER_TEMPLATE_FIELD_DEFINITIONS["inventory"]],
         },
         {
             "key": "students",
             "title": "Alumnos / Cursos",
             "description": "Pensada para academias, talleres y capacitaciones.",
-            "fields": ["Nombre", "Curso", "Email", "Telefono", "Fecha de inicio", "Cuota al dia"],
+            "fields": [item[1] for item in STARTER_TEMPLATE_FIELD_DEFINITIONS["students"]],
         },
         {
             "key": "clients",
             "title": "Clientes / Contactos",
             "description": "Sirve para relaciones comerciales, prospectos o soporte.",
-            "fields": ["Nombre", "Empresa", "Email", "Telefono", "Ultimo contacto", "Activo"],
+            "fields": [item[1] for item in STARTER_TEMPLATE_FIELD_DEFINITIONS["clients"]],
         },
         {
             "key": "generic",
             "title": "Otra base",
             "description": "Una estructura neutra para procesos internos, tareas, pedidos o cualquier otra cosa.",
-            "fields": ["Nombre", "Estado", "Responsable", "Fecha objetivo", "Importe"],
+            "fields": [item[1] for item in STARTER_TEMPLATE_FIELD_DEFINITIONS["generic"]],
         },
         {
             "key": "blank",
@@ -290,8 +235,51 @@ def _get_suggested_choices(template_key):
     return SUGGESTED_EXTRA_FIELDS.get(template_key, ())
 
 
+def _base_field_keys(template_key):
+    return [item[0] for item in STARTER_TEMPLATE_FIELD_DEFINITIONS.get(template_key, [])]
+
+
+def _field_option_catalog(template_key):
+    catalog = []
+    for field_key, label, field_type, required, show_in_table, help_text, options_text in STARTER_TEMPLATE_FIELD_DEFINITIONS.get(template_key, []):
+        catalog.append(
+            {
+                "key": field_key,
+                "label": label,
+                "field_type": field_type,
+                "kind": "base",
+                "help_text": help_text,
+            }
+        )
+    for extra_key, label in SUGGESTED_EXTRA_FIELDS.get(template_key, []):
+        definition = EXTRA_FIELD_DEFINITIONS.get(extra_key)
+        if not definition:
+            continue
+        catalog.append(
+            {
+                "key": extra_key,
+                "label": label,
+                "field_type": definition[1],
+                "kind": "extra",
+                "help_text": definition[4],
+            }
+        )
+    return catalog
+
+
 def _assistant_context(template_key):
     return ASSISTANT_COPY.get(template_key, ASSISTANT_COPY["generic"])
+
+
+def _template_use_case(template_key):
+    mapping = {
+        "inventory": AppDatabase.UseCase.INVENTORY,
+        "students": AppDatabase.UseCase.STUDENTS,
+        "clients": AppDatabase.UseCase.CLIENTS,
+        "generic": AppDatabase.UseCase.GENERIC,
+        "blank": AppDatabase.UseCase.GENERIC,
+    }
+    return mapping.get(template_key, AppDatabase.UseCase.GENERIC)
 
 
 def _create_extra_fields(database, selected_extra_keys):
@@ -314,6 +302,44 @@ def _create_extra_fields(database, selected_extra_keys):
         if extra_key in {"students_attendance", "clients_stage", "generic_status"}:
             field.options_text = "Pendiente\nEn curso\nResuelto" if extra_key == "generic_status" else "Regular\nInestable\nBaja" if extra_key == "students_attendance" else "Prospecto\nActivo\nPausado"
         field.save()
+
+
+def _create_selected_template_fields(database, template_key, selected_field_keys):
+    definitions = STARTER_TEMPLATE_FIELD_DEFINITIONS.get(template_key, [])
+    selected_keys = set(selected_field_keys)
+    position = 0
+    for field_key, label, field_type, required, show_in_table, help_text, options_text in definitions:
+        if field_key not in selected_keys:
+            continue
+        position += 1
+        CustomField.objects.create(
+            database=database,
+            label=label,
+            field_type=field_type,
+            required=required,
+            show_in_table=show_in_table,
+            help_text=help_text,
+            options_text=options_text,
+            position=position,
+        )
+
+
+def _create_manual_fields(database, custom_fields):
+    max_position = database.fields.count()
+    for item in custom_fields:
+        if not item.get("label") or not item.get("field_type"):
+            continue
+        max_position += 1
+        CustomField.objects.create(
+            database=database,
+            label=item["label"],
+            field_type=item["field_type"],
+            options_text=item.get("options_text", ""),
+            required=False,
+            show_in_table=True,
+            help_text="Campo agregado durante la configuracion inicial",
+            position=max_position,
+        )
 
 
 def _load_demo_records(database, user, template_key):
@@ -386,18 +412,20 @@ def database_create(request):
         "use_case": request.POST.get("use_case") or request.GET.get("use_case") or AppDatabase.UseCase.INVENTORY,
         "name": request.POST.get("name") or "",
         "description": request.POST.get("description") or "",
-        "suggested_fields": request.POST.getlist("suggested_fields"),
+        "selected_fields": request.POST.getlist("selected_fields"),
         "load_demo_data": request.POST.get("load_demo_data") in {"on", "true", "1"},
-        "preferred_mode": request.POST.get("preferred_mode") or "basic",
+        "custom_fields": [],
     }
     templates_catalog = _template_catalog()
     template_key = wizard_state["starter_template"]
+    wizard_state["use_case"] = _template_use_case(template_key)
+    if not wizard_state["selected_fields"]:
+        wizard_state["selected_fields"] = _base_field_keys(template_key)
     assistant = _assistant_context(template_key)
     template_form = WizardTemplateForm(
         request.POST if request.method == "POST" and step == "1" else None,
         initial={
             "starter_template": wizard_state["starter_template"],
-            "use_case": wizard_state["use_case"],
         },
     )
     setup_form = WizardSetupForm(
@@ -409,18 +437,19 @@ def database_create(request):
     )
     options_form = WizardOptionsForm(
         request.POST if request.method == "POST" and step == "3" else None,
-        suggested_choices=_get_suggested_choices(template_key),
+        field_choices=[(item["key"], item["label"]) for item in _field_option_catalog(template_key)],
         initial={
-            "suggested_fields": wizard_state["suggested_fields"],
+            "selected_fields": wizard_state["selected_fields"],
             "load_demo_data": wizard_state["load_demo_data"] if request.method == "POST" else True,
-            "preferred_mode": wizard_state["preferred_mode"],
+            "custom_fields_json": "[]",
         },
     )
 
     if request.method == "POST":
         if step == "1" and template_form.is_valid():
             cleaned = template_form.cleaned_data
-            return redirect(f"{request.path}?{urlencode({'step': 2, 'starter_template': cleaned['starter_template'], 'use_case': cleaned['use_case']})}")
+            selected_use_case = _template_use_case(cleaned["starter_template"])
+            return redirect(f"{request.path}?{urlencode({'step': 2, 'starter_template': cleaned['starter_template'], 'use_case': selected_use_case})}")
         if step == "2" and setup_form.is_valid():
             cleaned = setup_form.cleaned_data
             return redirect(
@@ -433,11 +462,18 @@ def database_create(request):
                 })}"
             )
         if step == "3" and options_form.is_valid():
-            wizard_state["suggested_fields"] = options_form.cleaned_data["suggested_fields"]
+            wizard_state["selected_fields"] = options_form.cleaned_data["selected_fields"] or _base_field_keys(template_key)
             wizard_state["load_demo_data"] = options_form.cleaned_data["load_demo_data"]
-            wizard_state["preferred_mode"] = options_form.cleaned_data["preferred_mode"]
+            wizard_state["custom_fields"] = options_form.cleaned_data["custom_fields"]
             step = "4"
         elif step == "4":
+            wizard_state["selected_fields"] = request.POST.getlist("selected_fields") or _base_field_keys(template_key)
+            custom_fields_json = request.POST.get("custom_fields_json", "[]")
+            try:
+                import json
+                wizard_state["custom_fields"] = json.loads(custom_fields_json)
+            except json.JSONDecodeError:
+                wizard_state["custom_fields"] = []
             database = AppDatabase.objects.create(
                 name=wizard_state["name"],
                 description=wizard_state["description"],
@@ -450,13 +486,17 @@ def database_create(request):
                 role=DatabaseMembership.Role.ADMIN,
             )
             selected_template = wizard_state["starter_template"]
-            if selected_template in STARTER_TEMPLATES:
-                STARTER_TEMPLATES[selected_template](database)
-            _create_extra_fields(database, wizard_state["suggested_fields"])
+            _create_selected_template_fields(database, selected_template, wizard_state["selected_fields"])
+            selected_extra_keys = [
+                key for key in wizard_state["selected_fields"]
+                if key in dict(SUGGESTED_EXTRA_FIELDS.get(selected_template, []))
+            ]
+            _create_extra_fields(database, selected_extra_keys)
+            _create_manual_fields(database, wizard_state["custom_fields"])
             if wizard_state["load_demo_data"]:
                 _load_demo_records(database, request.user, selected_template)
             messages.success(request, "La lista fue creada. El asistente te dejo una base lista para empezar.")
-            return redirect(f"/bases/{database.slug}/?tab=daily&mode={wizard_state['preferred_mode']}")
+            return redirect(f"/bases/{database.slug}/?tab=daily")
     return render(
         request,
         "database_create.html",
@@ -469,11 +509,14 @@ def database_create(request):
             "setup_form": setup_form,
             "options_form": options_form,
             "preview_template_fields": next((item["fields"] for item in templates_catalog if item["key"] == template_key), []),
+            "field_option_catalog": _field_option_catalog(template_key),
+            "base_field_keys": _base_field_keys(template_key),
             "preview_extras": [
                 EXTRA_FIELD_DEFINITIONS[key][0]
-                for key in wizard_state["suggested_fields"]
+                for key in wizard_state["selected_fields"]
                 if key in EXTRA_FIELD_DEFINITIONS
             ],
+            "preview_manual_fields": wizard_state["custom_fields"],
         },
     )
 
@@ -485,9 +528,6 @@ def database_detail(request, slug):
     if active_tab not in {"summary", "daily", "records", "structure", "manage"}:
         active_tab = "summary"
     edit_field_id = request.GET.get("edit_field")
-    mode = request.GET.get("mode", "basic")
-    if mode not in {"basic", "advanced"}:
-        mode = "basic"
     saved_view_id = request.GET.get("saved_view")
     q = request.GET.get("q", "").strip()
     priority = request.GET.get("priority", "").strip()
@@ -538,14 +578,12 @@ def database_detail(request, slug):
         for field in database.fields.all()
     ]
     daily_records = database.records.exclude(priority=Record.Priority.NORMAL)[:8]
-    basic_fields_preview = database.fields.filter(show_in_table=True)[:4]
     import_summary = request.session.pop(_import_session_key(database) + "_summary", None)
 
     context = {
         "database": database,
         "membership": membership,
         "active_tab": active_tab,
-        "mode": mode,
         "table_fields": database.fields.filter(show_in_table=True),
         "all_fields": database.fields.all(),
         "field_cards": field_cards,
@@ -554,7 +592,6 @@ def database_detail(request, slug):
         "records": page_obj.object_list,
         "page_obj": page_obj,
         "daily_records": daily_records,
-        "basic_fields_preview": basic_fields_preview,
         "query": q,
         "selected_priority": priority,
         "priority_choices": Record.Priority.choices,
@@ -605,6 +642,38 @@ def saved_view_create(request, slug):
 
 
 @login_required
+def database_delete(request, slug):
+    database, membership = _get_database_for_user(request.user, slug)
+    if membership.role != DatabaseMembership.Role.ADMIN:
+        return HttpResponseForbidden("Solo los administradores pueden eliminar una base.")
+
+    expected_phrase = "ELIMINAR"
+    if request.method == "POST":
+        confirmation_name = request.POST.get("confirmation_name", "").strip()
+        confirmation_phrase = request.POST.get("confirmation_phrase", "").strip().upper()
+        if confirmation_name != database.name or confirmation_phrase != expected_phrase:
+            messages.error(
+                request,
+                "La confirmacion no coincide. Escribe el nombre exacto de la base y la palabra ELIMINAR para continuar.",
+            )
+        else:
+            database_name = database.name
+            database.delete()
+            messages.success(request, f"La base {database_name} fue eliminada.")
+            return redirect("dashboard")
+
+    return render(
+        request,
+        "database_confirm_delete.html",
+        {
+            "database": database,
+            "membership": membership,
+            "expected_phrase": expected_phrase,
+        },
+    )
+
+
+@login_required
 def field_create(request, slug):
     database, membership = _get_database_for_user(request.user, slug)
     if membership.role != DatabaseMembership.Role.ADMIN:
@@ -616,7 +685,7 @@ def field_create(request, slug):
         messages.success(request, "El campo fue agregado.")
     else:
         messages.error(request, "Revisa los datos del campo.")
-    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure&mode=advanced")
+    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
 
 
 @login_required
@@ -632,7 +701,7 @@ def field_update(request, slug, field_id):
         messages.success(request, f"El campo {custom_field.label} fue actualizado.")
     else:
         messages.error(request, "No se pudo actualizar el campo.")
-    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure&mode=advanced")
+    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
 
 
 @login_required
@@ -648,11 +717,11 @@ def field_delete(request, slug, field_id):
                 request,
                 f"No se puede eliminar {custom_field.label} porque ya tiene datos cargados. Vacia o migra esos registros primero.",
             )
-            return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure&mode=advanced")
+            return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
         field_name = custom_field.label
         custom_field.delete()
         messages.success(request, f"El campo {field_name} fue eliminado.")
-    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure&mode=advanced")
+    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
 
 
 @login_required
