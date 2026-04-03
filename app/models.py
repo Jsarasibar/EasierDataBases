@@ -13,6 +13,7 @@ class AppDatabase(models.Model):
     name = models.CharField(max_length=120)
     slug = models.SlugField(max_length=140, unique=True)
     description = models.TextField(blank=True)
+    has_priority = models.BooleanField(default=False)
     use_case = models.CharField(
         max_length=20,
         choices=UseCase.choices,
@@ -31,6 +32,9 @@ class AppDatabase(models.Model):
 
     def __str__(self):
         return self.name
+
+    def get_primary_field(self):
+        return self.fields.filter(is_primary=True).order_by("position", "id").first() or self.fields.order_by("position", "id").first()
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -101,6 +105,7 @@ class CustomField(models.Model):
     )
     required = models.BooleanField(default=False)
     show_in_table = models.BooleanField(default=True)
+    is_primary = models.BooleanField(default=False)
     position = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -125,7 +130,11 @@ class CustomField(models.Model):
                 key = f"{base_key}_{counter}"
                 counter += 1
             self.key = key
+        if not self.pk and not self.database.fields.filter(is_primary=True).exists():
+            self.is_primary = True
         super().save(*args, **kwargs)
+        if self.is_primary:
+            CustomField.objects.filter(database=self.database).exclude(pk=self.pk).update(is_primary=False)
 
 
 class Record(models.Model):
@@ -183,7 +192,7 @@ class Record(models.Model):
                 related_record = field.relation_database.records.get(pk=int(value))
                 return related_record.title
             except (ValueError, TypeError, Record.DoesNotExist):
-                return value
+                return f"Registro relacionado no disponible (ID {value})"
         return value
 
 

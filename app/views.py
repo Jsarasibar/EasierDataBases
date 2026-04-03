@@ -1,4 +1,5 @@
 import csv
+import json
 import logging
 from pathlib import Path
 from urllib.parse import urlencode
@@ -13,6 +14,7 @@ from django.db.models.functions import Cast
 from django.http import Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.clickjacking import xframe_options_exempt
 
 from .forms import CSVImportForm, CSVMappingForm, CustomFieldForm, MembershipForm, RecordForm, RegisterForm, SaveViewForm, WizardOptionsForm, WizardSetupForm, WizardTemplateForm
 from .models import AppDatabase, CustomField, DatabaseMembership, Record, SavedView
@@ -251,6 +253,15 @@ def _field_option_catalog(template_key):
                 "help_text": help_text,
             }
         )
+    catalog.append(
+        {
+            "key": "__priority__",
+            "label": "Prioridad",
+            "field_type": "priority",
+            "kind": "system",
+            "help_text": "Te permite destacar elementos normales, altos o urgentes en esta base.",
+        }
+    )
     for extra_key, label in SUGGESTED_EXTRA_FIELDS.get(template_key, []):
         definition = EXTRA_FIELD_DEFINITIONS.get(extra_key)
         if not definition:
@@ -283,6 +294,7 @@ def _template_use_case(template_key):
 
 
 def _create_extra_fields(database, selected_extra_keys):
+    created_fields = []
     max_position = database.fields.count()
     for extra_key in selected_extra_keys:
         definition = EXTRA_FIELD_DEFINITIONS.get(extra_key)
@@ -302,17 +314,20 @@ def _create_extra_fields(database, selected_extra_keys):
         if extra_key in {"students_attendance", "clients_stage", "generic_status"}:
             field.options_text = "Pendiente\nEn curso\nResuelto" if extra_key == "generic_status" else "Regular\nInestable\nBaja" if extra_key == "students_attendance" else "Prospecto\nActivo\nPausado"
         field.save()
+        created_fields.append(field)
+    return created_fields
 
 
 def _create_selected_template_fields(database, template_key, selected_field_keys):
     definitions = STARTER_TEMPLATE_FIELD_DEFINITIONS.get(template_key, [])
     selected_keys = set(selected_field_keys)
     position = 0
+    created_fields = []
     for field_key, label, field_type, required, show_in_table, help_text, options_text in definitions:
         if field_key not in selected_keys:
             continue
         position += 1
-        CustomField.objects.create(
+        created_fields.append(CustomField.objects.create(
             database=database,
             label=label,
             field_type=field_type,
@@ -321,16 +336,18 @@ def _create_selected_template_fields(database, template_key, selected_field_keys
             help_text=help_text,
             options_text=options_text,
             position=position,
-        )
+        ))
+    return created_fields
 
 
 def _create_manual_fields(database, custom_fields):
+    created_fields = []
     max_position = database.fields.count()
     for item in custom_fields:
         if not item.get("label") or not item.get("field_type"):
             continue
         max_position += 1
-        CustomField.objects.create(
+        created_fields.append(CustomField.objects.create(
             database=database,
             label=item["label"],
             field_type=item["field_type"],
@@ -339,16 +356,89 @@ def _create_manual_fields(database, custom_fields):
             show_in_table=True,
             help_text="Campo agregado durante la configuracion inicial",
             position=max_position,
+        ))
+    return created_fields
+
+
+def _record_title_from_value(field, value):
+    if value in ("", None):
+        return ""
+    if field.field_type == CustomField.FieldType.BOOLEAN:
+        return "Si" if value else "No"
+    if field.field_type == CustomField.FieldType.RELATION and field.relation_database:
+        related_record = field.relation_database.records.filter(pk=value).first()
+        return related_record.title if related_record else str(value)
+    return str(value).strip()
+
+
+def _resolve_related_record(field, raw_value):
+    if not field.relation_database:
+        return None, "La base relacionada ya no esta disponible."
+    lookup_value = str(raw_value).strip()
+    if not lookup_value:
+        return None, "No se informo ningun valor para la relacion."
+    if lookup_value.isdigit():
+        related_record = field.relation_database.records.filter(pk=int(lookup_value)).first()
+        if related_record:
+            return related_record, None
+    matches = list(field.relation_database.records.filter(title__iexact=lookup_value)[:2])
+    if len(matches) == 1:
+        return matches[0], None
+    if len(matches) > 1:
+        return None, (
+            f"Hay varios registros llamados '{lookup_value}' en {field.relation_database.name}. "
+            "Importa usando el ID del registro relacionado."
         )
+    return None, f"No se encontro '{lookup_value}' en {field.relation_database.name}."
+
+
+def _relation_preview_payload(related_record):
+    preview_fields = []
+    for related_field in related_record.database.fields.filter(show_in_table=True)[:4]:
+        preview_fields.append(
+            {
+                "label": related_field.label,
+                "value": related_record.get_display_value(related_field) or "-",
+            }
+        )
+    return {
+        "title": related_record.title,
+        "database_name": related_record.database.name,
+        "detail_url": reverse("record_detail", args=[related_record.database.slug, related_record.pk]),
+        "edit_url": reverse("record_edit", args=[related_record.database.slug, related_record.pk]),
+        "fields": preview_fields,
+    }
+
+
+def _sync_record_titles_for_field(database, primary_field):
+    updated = 0
+    for record in database.records.all():
+        raw_value = record.data.get(primary_field.key)
+        new_title = _record_title_from_value(primary_field, raw_value).strip()
+        if new_title and record.title != new_title:
+            record.title = new_title
+            record.save(update_fields=["title", "updated_at"])
+            updated += 1
+    return updated
 
 
 def _load_demo_records(database, user, template_key):
+    primary_field = database.get_primary_field()
+    available_field_keys = {field.key for field in database.fields.all()}
+    if not primary_field:
+        return
     for item in DEMO_RECORDS.get(template_key, []):
+        data = {
+            key: value
+            for key, value in item["data"].items()
+            if key in available_field_keys
+        }
+        title = _record_title_from_value(primary_field, data.get(primary_field.key)) or item["title"]
         Record.objects.create(
             database=database,
-            title=item["title"],
-            priority=item["priority"],
-            data=item["data"],
+            title=title,
+            priority=item["priority"] if database.has_priority else Record.Priority.NORMAL,
+            data=data,
             created_by=user,
             updated_by=user,
         )
@@ -410,8 +500,8 @@ def database_create(request):
     wizard_state = {
         "starter_template": request.POST.get("starter_template") or request.GET.get("starter_template") or "inventory",
         "use_case": request.POST.get("use_case") or request.GET.get("use_case") or AppDatabase.UseCase.INVENTORY,
-        "name": request.POST.get("name") or "",
-        "description": request.POST.get("description") or "",
+        "name": request.POST.get("name") or request.GET.get("name") or "",
+        "description": request.POST.get("description") or request.GET.get("description") or "",
         "selected_fields": request.POST.getlist("selected_fields"),
         "load_demo_data": request.POST.get("load_demo_data") in {"on", "true", "1"},
         "custom_fields": [],
@@ -419,7 +509,7 @@ def database_create(request):
     templates_catalog = _template_catalog()
     template_key = wizard_state["starter_template"]
     wizard_state["use_case"] = _template_use_case(template_key)
-    if not wizard_state["selected_fields"]:
+    if request.method != "POST" and not wizard_state["selected_fields"]:
         wizard_state["selected_fields"] = _base_field_keys(template_key)
     assistant = _assistant_context(template_key)
     template_form = WizardTemplateForm(
@@ -446,6 +536,44 @@ def database_create(request):
     )
 
     if request.method == "POST":
+        if request.POST.get("nav") == "back":
+            wizard_state["selected_fields"] = request.POST.getlist("selected_fields")
+            wizard_state["load_demo_data"] = request.POST.get("load_demo_data") in {"on", "true", "1"}
+            custom_fields_json = request.POST.get("custom_fields_json", "[]")
+            try:
+                wizard_state["custom_fields"] = json.loads(custom_fields_json)
+            except json.JSONDecodeError:
+                wizard_state["custom_fields"] = []
+            options_form = WizardOptionsForm(
+                initial={
+                    "selected_fields": wizard_state["selected_fields"],
+                    "load_demo_data": wizard_state["load_demo_data"],
+                    "custom_fields_json": custom_fields_json,
+                },
+                field_choices=[(item["key"], item["label"]) for item in _field_option_catalog(template_key)],
+            )
+            return render(
+                request,
+                "database_create.html",
+                {
+                    "templates_catalog": templates_catalog,
+                    "step": "3",
+                    "wizard_state": wizard_state,
+                    "assistant": assistant,
+                    "template_form": template_form,
+                    "setup_form": setup_form,
+                    "options_form": options_form,
+                    "preview_template_fields": next((item["fields"] for item in templates_catalog if item["key"] == template_key), []),
+                    "field_option_catalog": _field_option_catalog(template_key),
+                    "base_field_keys": _base_field_keys(template_key),
+                    "preview_extras": [
+                        EXTRA_FIELD_DEFINITIONS[key][0]
+                        for key in wizard_state["selected_fields"]
+                        if key in EXTRA_FIELD_DEFINITIONS
+                    ],
+                    "preview_manual_fields": wizard_state["custom_fields"],
+                },
+            )
         if step == "1" and template_form.is_valid():
             cleaned = template_form.cleaned_data
             selected_use_case = _template_use_case(cleaned["starter_template"])
@@ -462,21 +590,21 @@ def database_create(request):
                 })}"
             )
         if step == "3" and options_form.is_valid():
-            wizard_state["selected_fields"] = options_form.cleaned_data["selected_fields"] or _base_field_keys(template_key)
+            wizard_state["selected_fields"] = options_form.cleaned_data["selected_fields"]
             wizard_state["load_demo_data"] = options_form.cleaned_data["load_demo_data"]
             wizard_state["custom_fields"] = options_form.cleaned_data["custom_fields"]
             step = "4"
         elif step == "4":
-            wizard_state["selected_fields"] = request.POST.getlist("selected_fields") or _base_field_keys(template_key)
+            wizard_state["selected_fields"] = request.POST.getlist("selected_fields")
             custom_fields_json = request.POST.get("custom_fields_json", "[]")
             try:
-                import json
                 wizard_state["custom_fields"] = json.loads(custom_fields_json)
             except json.JSONDecodeError:
                 wizard_state["custom_fields"] = []
             database = AppDatabase.objects.create(
                 name=wizard_state["name"],
                 description=wizard_state["description"],
+                has_priority="__priority__" in wizard_state["selected_fields"],
                 use_case=wizard_state["use_case"],
                 created_by=request.user,
             )
@@ -524,12 +652,13 @@ def database_create(request):
 @login_required
 def database_detail(request, slug):
     database, membership = _get_database_for_user(request.user, slug)
-    active_tab = request.GET.get("tab", "summary")
+    primary_field = database.get_primary_field()
+    active_tab = request.GET.get("tab", "records")
     if active_tab not in {"summary", "daily", "records", "structure", "manage"}:
-        active_tab = "summary"
-    edit_field_id = request.GET.get("edit_field")
+        active_tab = "records"
     saved_view_id = request.GET.get("saved_view")
     q = request.GET.get("q", "").strip()
+    record_id = request.GET.get("record_id", "").strip()
     priority = request.GET.get("priority", "").strip()
     view_mode = request.GET.get("view", "table")
     if view_mode not in {"table", "cards"}:
@@ -538,71 +667,102 @@ def database_detail(request, slug):
     sort_map = {
         "updated": "-updated_at",
         "title": "title",
-        "priority": "priority",
         "created": "-created_at",
     }
+    if database.has_priority:
+        sort_map["priority"] = "priority"
 
     records = database.records.all().annotate(data_text=Cast("data", output_field=TextField()))
+    if record_id.isdigit():
+        records = records.filter(pk=int(record_id))
     if q:
-        records = records.filter(Q(title__icontains=q) | Q(data_text__icontains=q))
-    if priority:
+        id_query = Q(pk=int(q)) if q.isdigit() else Q()
+        records = records.filter(id_query | Q(title__icontains=q) | Q(data_text__icontains=q))
+    if priority and database.has_priority:
         records = records.filter(priority=priority)
     if saved_view_id:
         saved_view = database.saved_views.filter(user=request.user, pk=saved_view_id).first()
         if saved_view:
             q = saved_view.query
-            priority = saved_view.priority
+            priority = saved_view.priority if database.has_priority else ""
             sort = saved_view.sort
             view_mode = saved_view.view_mode
             records = database.records.all().annotate(data_text=Cast("data", output_field=TextField()))
+            if record_id.isdigit():
+                records = records.filter(pk=int(record_id))
             if q:
-                records = records.filter(Q(title__icontains=q) | Q(data_text__icontains=q))
-            if priority:
+                id_query = Q(pk=int(q)) if q.isdigit() else Q()
+                records = records.filter(id_query | Q(title__icontains=q) | Q(data_text__icontains=q))
+            if priority and database.has_priority:
                 records = records.filter(priority=priority)
     records = records.order_by(sort_map.get(sort, "-updated_at"))
     paginator = Paginator(records, 20)
     page_obj = paginator.get_page(request.GET.get("page") or 1)
 
     total_records = database.records.count()
-    high_priority_count = database.records.filter(priority=Record.Priority.HIGH).count()
-    urgent_count = database.records.filter(priority=Record.Priority.URGENT).count()
+    high_priority_count = database.records.filter(priority=Record.Priority.HIGH).count() if database.has_priority else 0
+    urgent_count = database.records.filter(priority=Record.Priority.URGENT).count() if database.has_priority else 0
     relation_fields = database.fields.filter(field_type=CustomField.FieldType.RELATION).select_related("relation_database")
     select_fields = database.fields.filter(field_type=CustomField.FieldType.SELECT)
+    relation_previews = {}
+    accessible_database_ids = set(_accessible_databases_for_user(request.user).values_list("pk", flat=True))
+    for record in page_obj.object_list:
+        for field in relation_fields:
+            raw_value = record.data.get(field.key)
+            if not raw_value or not field.relation_database or field.relation_database_id not in accessible_database_ids:
+                continue
+            related_record, relation_error = _resolve_related_record(field, raw_value)
+            if related_record:
+                relation_previews[f"{record.pk}:{field.key}"] = _relation_preview_payload(related_record)
+            elif relation_error:
+                relation_previews[f"{record.pk}:{field.key}"] = {
+                    "title": "Relacion no disponible",
+                    "database_name": field.relation_database.name,
+                    "detail_url": "",
+                    "edit_url": "",
+                    "fields": [{"label": "Estado", "value": relation_error}],
+                }
     field_cards = [
         {
             "field": field,
             "form": CustomFieldForm(database=database, actor=request.user, instance=field),
-            "is_editing": str(field.pk) == str(edit_field_id),
             "has_data": _field_has_data(field),
         }
         for field in database.fields.all()
     ]
-    daily_records = database.records.exclude(priority=Record.Priority.NORMAL)[:8]
+    daily_records = (
+        database.records.exclude(priority=Record.Priority.NORMAL)[:8]
+        if database.has_priority
+        else database.records.all()[:8]
+    )
     import_summary = request.session.pop(_import_session_key(database) + "_summary", None)
 
     context = {
         "database": database,
+        "primary_field": primary_field,
+        "has_priority": database.has_priority,
         "membership": membership,
         "active_tab": active_tab,
         "table_fields": database.fields.filter(show_in_table=True),
         "all_fields": database.fields.all(),
         "field_cards": field_cards,
         "relation_fields": relation_fields,
+        "relation_previews": relation_previews,
         "select_fields": select_fields,
         "records": page_obj.object_list,
         "page_obj": page_obj,
         "daily_records": daily_records,
         "query": q,
+        "selected_record_id": record_id,
         "selected_priority": priority,
-        "priority_choices": Record.Priority.choices,
+        "priority_choices": Record.Priority.choices if database.has_priority else [],
         "view_mode": view_mode,
         "sort": sort,
         "sort_choices": [
             ("updated", "Actualizados recientemente"),
             ("created", "Mas nuevos"),
             ("title", "Nombre"),
-            ("priority", "Prioridad"),
-        ],
+        ] + ([("priority", "Prioridad")] if database.has_priority else []),
         "stats": {
             "records": total_records,
             "high": high_priority_count,
@@ -632,13 +792,37 @@ def saved_view_create(request, slug):
             name=form.cleaned_data["name"],
             defaults={
                 "query": request.POST.get("query", "").strip(),
-                "priority": request.POST.get("priority", "").strip(),
+                "priority": request.POST.get("priority", "").strip() if database.has_priority else "",
                 "sort": request.POST.get("sort", "updated"),
                 "view_mode": request.POST.get("view_mode", "table"),
             },
         )
         messages.success(request, "La vista fue guardada para reutilizarla.")
     return redirect("database_detail", slug=database.slug)
+
+
+@login_required
+def database_statistics(request, slug):
+    database, membership = _get_database_for_user(request.user, slug)
+    chart_ready_fields = database.fields.filter(
+        field_type__in=[
+            CustomField.FieldType.SELECT,
+            CustomField.FieldType.NUMBER,
+            CustomField.FieldType.CURRENCY,
+            CustomField.FieldType.DATE,
+            CustomField.FieldType.BOOLEAN,
+        ]
+    )
+    return render(
+        request,
+        "database_statistics.html",
+        {
+            "database": database,
+            "membership": membership,
+            "chart_ready_fields": chart_ready_fields,
+            "total_records": database.records.count(),
+        },
+    )
 
 
 @login_required
@@ -705,6 +889,52 @@ def field_update(request, slug, field_id):
 
 
 @login_required
+def field_set_primary_select(request, slug):
+    database, membership = _get_database_for_user(request.user, slug)
+    if membership.role != DatabaseMembership.Role.ADMIN:
+        return HttpResponseForbidden("Solo los administradores pueden definir el nombre visible del registro.")
+
+    if request.method == "POST":
+        selected_field_id = request.POST.get("primary_field_id", "").strip()
+        custom_field = database.fields.filter(pk=selected_field_id).first()
+        if custom_field:
+            custom_field.is_primary = True
+            custom_field.save(update_fields=["is_primary"])
+            synced = _sync_record_titles_for_field(database, custom_field)
+            if synced:
+                messages.success(
+                    request,
+                    f"{custom_field.label} ahora define el nombre visible del registro. Se actualizaron {synced} registros existentes.",
+                )
+            else:
+                messages.success(request, f"{custom_field.label} ahora define el nombre visible del registro.")
+        else:
+            messages.error(request, "No se encontro el campo seleccionado para el registro.")
+    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
+
+
+@login_required
+def field_set_primary(request, slug, field_id):
+    database, membership = _get_database_for_user(request.user, slug)
+    if membership.role != DatabaseMembership.Role.ADMIN:
+        return HttpResponseForbidden("Solo los administradores pueden definir el nombre visible del registro.")
+
+    custom_field = get_object_or_404(database.fields, pk=field_id)
+    if request.method == "POST":
+        custom_field.is_primary = True
+        custom_field.save(update_fields=["is_primary"])
+        synced = _sync_record_titles_for_field(database, custom_field)
+        if synced:
+            messages.success(
+                request,
+                f"{custom_field.label} ahora define el nombre visible del registro. Se actualizaron {synced} registros existentes.",
+            )
+        else:
+            messages.success(request, f"{custom_field.label} ahora define el nombre visible del registro.")
+    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
+
+
+@login_required
 def field_delete(request, slug, field_id):
     database, membership = _get_database_for_user(request.user, slug)
     if membership.role != DatabaseMembership.Role.ADMIN:
@@ -719,7 +949,14 @@ def field_delete(request, slug, field_id):
             )
             return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
         field_name = custom_field.label
+        was_primary = custom_field.is_primary
         custom_field.delete()
+        if was_primary:
+            next_field = database.fields.order_by("position", "id").first()
+            if next_field:
+                next_field.is_primary = True
+                next_field.save(update_fields=["is_primary"])
+                _sync_record_titles_for_field(database, next_field)
         messages.success(request, f"El campo {field_name} fue eliminado.")
     return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=structure")
 
@@ -740,11 +977,21 @@ def member_create(request, slug):
 
 
 @login_required
+@xframe_options_exempt
 def record_create(request, slug):
     database, membership = _get_database_for_user(request.user, slug)
     form = RecordForm(database, request.POST or None, actor=request.user)
     if request.method == "POST" and form.is_valid():
-        form.save(user=request.user)
+        record = form.save(user=request.user)
+        if request.GET.get("popup") == "1" and request.GET.get("relation_field"):
+            return render(
+                request,
+                "related_record_popup_done.html",
+                {
+                    "record": record,
+                    "relation_field": request.GET.get("relation_field"),
+                },
+            )
         messages.success(request, "Registro creado.")
         return redirect("database_detail", slug=database.slug)
     return render(
@@ -766,15 +1013,16 @@ def record_detail(request, slug, pk):
         raw_value = record.data.get(field.key)
         if not raw_value or not field.relation_database or field.relation_database_id not in accessible_database_ids:
             continue
-        related_record = field.relation_database.records.filter(pk=raw_value).first()
-        if related_record:
-            outgoing_relations.append(
-                {
-                    "field": field,
-                    "database": field.relation_database,
-                    "record": related_record,
-                }
-            )
+        related_record, relation_error = _resolve_related_record(field, raw_value)
+        outgoing_relations.append(
+            {
+                "field": field,
+                "database": field.relation_database,
+                "record": related_record,
+                "error": relation_error,
+                "raw_value": raw_value,
+            }
+        )
 
     incoming_relations = []
     relation_fields = (
@@ -881,6 +1129,7 @@ def records_import_start(request, slug):
 @login_required
 def records_import_map(request, slug):
     database, membership = _get_database_for_user(request.user, slug)
+    primary_field = database.get_primary_field()
     session_key = _import_session_key(database)
     payload = request.session.get(session_key)
     if not payload:
@@ -900,10 +1149,13 @@ def records_import_map(request, slug):
             for header in headers
             if form.cleaned_data[f"map_{header}"] != "__ignore__"
         }
-        if "title" not in mapping.values():
-            messages.error(request, "Debes asignar una columna al nombre principal antes de importar.")
+        if not primary_field:
+            messages.error(request, "Esta base no tiene un campo principal definido todavia.")
             return redirect("records_import_map", slug=database.slug)
-        valid_priorities = {choice[0] for choice in Record.Priority.choices}
+        if primary_field.key not in mapping.values():
+            messages.error(request, f"Debes asignar una columna al campo {primary_field.label} antes de importar.")
+            return redirect("records_import_map", slug=database.slug)
+        valid_priorities = {choice[0] for choice in Record.Priority.choices} if database.has_priority else set()
         imported = 0
         skipped = 0
         row_errors = []
@@ -915,15 +1167,17 @@ def records_import_map(request, slug):
                 for header, target in mapping.items():
                     normalized[target] = row.get(header, "")
 
-                title = str(normalized.get("title", "")).strip()
+                title = str(normalized.get(primary_field.key, "")).strip()
                 if not title:
                     skipped += 1
-                    row_errors.append(f"Fila {row_number}: falta el nombre principal.")
+                    row_errors.append(f"Fila {row_number}: falta el valor para {primary_field.label}.")
                     continue
 
-                priority = str(normalized.get("priority", Record.Priority.NORMAL)).lower().strip() or Record.Priority.NORMAL
-                if priority not in valid_priorities:
-                    priority = Record.Priority.NORMAL
+                priority = Record.Priority.NORMAL
+                if database.has_priority:
+                    priority = str(normalized.get("priority", Record.Priority.NORMAL)).lower().strip() or Record.Priority.NORMAL
+                    if priority not in valid_priorities:
+                        priority = Record.Priority.NORMAL
 
                 record_data = {}
                 for field in database.fields.all():
@@ -937,11 +1191,11 @@ def records_import_map(request, slug):
                             raise ValidationError(
                                 f"No tienes acceso a la base relacionada {field.relation_database.name} para importar este campo."
                             )
-                        related_record = field.relation_database.records.filter(title__iexact=str(value).strip()).first()
+                        related_record, relation_error = _resolve_related_record(field, value)
                         if not related_record:
                             skipped += 1
                             row_errors.append(
-                                f"Fila {row_number}: no se encontro '{value}' en {field.relation_database.name}."
+                                f"Fila {row_number}: {relation_error}"
                             )
                             record_data = None
                             break
@@ -1011,10 +1265,15 @@ def records_export(request, slug):
 
     writer = csv.writer(response)
     fields = list(database.fields.all())
-    writer.writerow(["title", "priority", *[field.label for field in fields]])
+    headers = [field.label for field in fields]
+    if database.has_priority:
+        headers.append("Prioridad")
+    writer.writerow(headers)
     for record in database.records.all():
-        row = [record.title, record.priority]
+        row = []
         for field in fields:
             row.append(record.get_display_value(field))
+        if database.has_priority:
+            row.append(record.priority)
         writer.writerow(row)
     return response

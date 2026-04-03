@@ -7,7 +7,7 @@
     <div class="panel-head">
         <span class="eyebrow">{{ database.name }}</span>
         <h1>{% if mode == 'edit' %}Editar registro{% else %}Nuevo registro{% endif %}</h1>
-        <p>Carga informacion sin programar y respetando la estructura definida para la base.</p>
+        <p>Carga informacion usando los campos reales de esta base. El nombre visible del registro sale del campo principal que definiste en la estructura.</p>
     </div>
     <form method="post" class="stack-form">
         {% csrf_token %}
@@ -26,4 +26,85 @@
         </div>
     </form>
 </section>
+<div class="related-modal" id="related-modal" hidden>
+    <div class="related-modal-backdrop" data-related-close></div>
+    <div class="related-modal-panel" role="dialog" aria-modal="true" aria-labelledby="related-modal-title">
+        <div class="member-row">
+            <div>
+                <span class="eyebrow">Relacion entre bases</span>
+                <h2 id="related-modal-title">Agregar registro relacionado</h2>
+            </div>
+            <button type="button" class="field-delete-button" data-related-close>Cerrar</button>
+        </div>
+        <p class="related-modal-copy">Crea un nuevo registro en la base relacionada sin salir del formulario actual. Al guardarlo quedara seleccionado automaticamente.</p>
+        <iframe id="related-modal-frame" title="Crear registro relacionado"></iframe>
+    </div>
+</div>
+<script>
+    (() => {
+        const sentinel = "__create_related__";
+        const relationSelects = Array.from(document.querySelectorAll("select[data-relation-create-url]"));
+        const modal = document.getElementById("related-modal");
+        const modalFrame = document.getElementById("related-modal-frame");
+        const closeButtons = document.querySelectorAll("[data-related-close]");
+        if (!relationSelects.length) {
+            return;
+        }
+
+        const closeModal = () => {
+            modal.hidden = true;
+            modalFrame.removeAttribute("src");
+            document.body.classList.remove("modal-open");
+        };
+
+        const openModalForSelect = (select) => {
+            const createUrl = select.dataset.relationCreateUrl;
+            const relationField = select.dataset.relationFieldKey;
+            const popupUrl = `${createUrl}?popup=1&embedded=1&relation_field=${encodeURIComponent(relationField)}`;
+            modalFrame.src = popupUrl;
+            modal.hidden = false;
+            document.body.classList.add("modal-open");
+        };
+
+        relationSelects.forEach((select) => {
+            if (!select.querySelector(`option[value="${sentinel}"]`)) {
+                const createOption = document.createElement("option");
+                createOption.value = sentinel;
+                createOption.textContent = select.dataset.relationCreateLabel || "+ Agregar nuevo";
+                select.insertBefore(createOption, select.firstChild);
+            }
+            select.addEventListener("change", () => {
+                if (select.value !== sentinel) {
+                    return;
+                }
+                select.value = "";
+                openModalForSelect(select);
+            });
+        });
+
+        closeButtons.forEach((button) => button.addEventListener("click", closeModal));
+
+        window.addEventListener("message", (event) => {
+            if (!event.data || event.data.type !== "easierdatabases:related-record-created") {
+                return;
+            }
+            const { relationField, recordId, recordLabel } = event.data;
+            const select = relationSelects.find((item) => item.dataset.relationFieldKey === relationField);
+            if (!select) {
+                return;
+            }
+            let option = select.querySelector(`option[value="${recordId}"]`);
+            if (!option) {
+                option = document.createElement("option");
+                option.value = recordId;
+                option.textContent = `#${recordId} - ${recordLabel}`;
+                select.appendChild(option);
+            } else {
+                option.textContent = `#${recordId} - ${recordLabel}`;
+            }
+            select.value = String(recordId);
+            closeModal();
+        });
+    })();
+</script>
 {% endblock %}

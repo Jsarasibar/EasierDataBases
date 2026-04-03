@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Relacion creada</title>
+</head>
+<body>
+    <script>
+        (() => {
+            const payload = {
+                type: "easierdatabases:related-record-created",
+                relationField: "{{ relation_field|escapejs }}",
+                recordId: "{{ record.pk }}",
+                recordLabel: "{{ record.title|escapejs }}",
+            };
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage(payload, "*");
+            } else if (window.opener) {
+                window.opener.postMessage(payload, "*");
+            }
+            if (window.parent === window && window.opener) {
+                window.close();
+            }
+        })();
+    </script>
+    <p>Registro creado. Puedes cerrar esta ventana.</p>
+</body>
+</html>

@@ -23,10 +23,12 @@
             <p>Informacion principal y campos personalizados.</p>
         </div>
         <div class="record-meta">
-            <div class="record-meta-row">
-                <span>Prioridad</span>
-                <strong>{{ record.get_priority_display }}</strong>
-            </div>
+            {% if database.has_priority %}
+                <div class="record-meta-row">
+                    <span>Prioridad</span>
+                    <strong>{{ record.get_priority_display }}</strong>
+                </div>
+            {% endif %}
             {% for field in fields %}
                 <div class="record-meta-row">
                     <span>{{ field.label }}</span>
@@ -43,11 +45,19 @@
         </div>
         <div class="stack-form compact">
             {% for relation in outgoing_relations %}
-                <a class="database-card" href="{% url 'record_detail' relation.database.slug relation.record.pk %}">
-                    <span class="pill">{{ relation.field.label }}</span>
-                    <h3>{{ relation.record.title }}</h3>
-                    <p>{{ relation.database.name }}</p>
-                </a>
+                {% if relation.record %}
+                    <a class="database-card" href="{% url 'record_detail' relation.database.slug relation.record.pk %}">
+                        <span class="pill">{{ relation.field.label }}</span>
+                        <h3>{{ relation.record.title }}</h3>
+                        <p>{{ relation.database.name }}</p>
+                    </a>
+                {% else %}
+                    <article class="database-card">
+                        <span class="pill">{{ relation.field.label }}</span>
+                        <h3>Relacion no disponible</h3>
+                        <p>{{ relation.error }}</p>
+                    </article>
+                {% endif %}
             {% empty %}
                 <div class="empty-state">
                     <h3>Sin relaciones directas</h3>

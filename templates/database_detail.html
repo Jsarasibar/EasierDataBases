@@ -17,9 +17,9 @@
 </section>
 
 <section class="tab-strip">
-    <a class="tab-link {% if active_tab == 'summary' %}is-current{% endif %}" href="?tab=summary">Resumen</a>
-    <a class="tab-link {% if active_tab == 'daily' %}is-current{% endif %}" href="?tab=daily">Trabajo diario</a>
     <a class="tab-link {% if active_tab == 'records' %}is-current{% endif %}" href="?tab=records">Registros</a>
+    <a class="tab-link {% if active_tab == 'daily' %}is-current{% endif %}" href="?tab=daily">Trabajo diario</a>
+    <a class="tab-link {% if active_tab == 'summary' %}is-current{% endif %}" href="?tab=summary">Resumen</a>
     <a class="tab-link {% if active_tab == 'structure' %}is-current{% endif %}" href="?tab=structure">Estructura</a>
     <a class="tab-link {% if active_tab == 'manage' %}is-current{% endif %}" href="?tab=manage">Gestion</a>
 </section>
@@ -39,8 +39,12 @@
             </div>
             <div class="record-meta">
                 <div class="record-meta-row"><span>Campos tipo seleccion</span><strong>{{ stats.selects }}</strong></div>
-                <div class="record-meta-row"><span>Prioridad alta</span><strong>{{ stats.high }}</strong></div>
-                <div class="record-meta-row"><span>Prioridad urgente</span><strong>{{ stats.urgent }}</strong></div>
+                {% if has_priority %}
+                    <div class="record-meta-row"><span>Prioridad alta</span><strong>{{ stats.high }}</strong></div>
+                    <div class="record-meta-row"><span>Prioridad urgente</span><strong>{{ stats.urgent }}</strong></div>
+                {% else %}
+                    <div class="record-meta-row"><span>Campo principal</span><strong>{{ primary_field.label|default:"Sin definir" }}</strong></div>
+                {% endif %}
                 <div class="record-meta-row"><span>Miembros</span><strong>{{ database.memberships.count }}</strong></div>
             </div>
         </article>
@@ -63,6 +67,10 @@
                     <h3>Importar, exportar y compartir</h3>
                     <p>Trae datos desde CSV, exporta la base o asigna roles a otras personas.</p>
                 </a>
+                <a class="database-card" href="{% url 'database_statistics' database.slug %}">
+                    <h3>Graficos (estadisticas)</h3>
+                    <p>Prepara una vista dedicada para analizar la base por campos seleccionados.</p>
+                </a>
             </div>
         </article>
     </section>
@@ -82,13 +90,15 @@
                 <a class="database-card" href="{% url 'record_detail' database.slug record.pk %}">
                     <div class="member-row">
                         <strong>{{ record.title }}</strong>
-                        <span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span>
+                        {% if has_priority %}
+                            <span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span>
+                        {% endif %}
                     </div>
                     <p>Abre el elemento y continua desde donde lo dejaste.</p>
                 </a>
             {% empty %}
                 <div class="empty-state">
-                    <h3>No hay urgencias por ahora</h3>
+                    <h3>{% if has_priority %}No hay urgencias por ahora{% else %}Todavia no hay actividad reciente{% endif %}</h3>
                     <p>Puedes agregar un nuevo elemento o revisar toda la lista desde Registros.</p>
                 </div>
             {% endfor %}
@@ -98,153 +108,283 @@
 
 {% if active_tab == 'records' %}
     <section class="panel">
-        <div class="panel-head split">
-            <div>
-                <h2>Buscar y operar elementos</h2>
-                <p>Esta vista se enfoca solo en encontrar, filtrar y agregar registros.</p>
-            </div>
-            <div class="hero-actions">
-                <a class="button" href="{% url 'record_create' database.slug %}">Agregar registro</a>
-            </div>
-        </div>
-        <div class="panel-head top-gap">
-            <h3>Vistas guardadas</h3>
-            <p>Reutiliza filtros frecuentes sin volver a armarlos.</p>
-        </div>
-        {% if import_summary %}
-            <div class="import-summary">
-                <div class="record-meta">
-                    <div class="record-meta-row"><span>Filas detectadas</span><strong>{{ import_summary.total_rows }}</strong></div>
-                    <div class="record-meta-row"><span>Filas importadas</span><strong>{{ import_summary.imported }}</strong></div>
-                    <div class="record-meta-row"><span>Filas omitidas</span><strong>{{ import_summary.skipped }}</strong></div>
+        <div class="records-layout">
+            <div class="records-main">
+                <div class="panel-head split">
+                    <div>
+                        <h2>Registros de la base</h2>
+                        <p>La tabla queda al frente para que puedas revisar datos apenas entras.</p>
+                    </div>
+                    <div class="view-switch">
+                        <a class="pill {% if view_mode == 'table' %}is-active{% endif %}" href="?tab=records&record_id={{ selected_record_id }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view=table">Tabla</a>
+                        <a class="pill {% if view_mode == 'cards' %}is-active{% endif %}" href="?tab=records&record_id={{ selected_record_id }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view=cards">Tarjetas</a>
+                    </div>
                 </div>
-                {% if import_summary.errors %}
-                    <div class="tag-list">
-                        {% for item in import_summary.errors %}
-                            <span class="tag">{{ item }}</span>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            </div>
-        {% endif %}
-        <div class="tag-list">
-            {% for saved in saved_views %}
-                <a class="tag" href="?tab=records&saved_view={{ saved.pk }}">{{ saved.name }}</a>
-            {% empty %}
-                <span class="tag">Todavia no guardaste vistas</span>
-            {% endfor %}
-        </div>
-        <form method="get" class="toolbar">
-            <input type="hidden" name="tab" value="records">
-            <input type="hidden" name="mode" value="{{ mode }}">
-            <input type="text" name="q" value="{{ query }}" placeholder="Buscar por nombre o contenido...">
-            <select name="priority">
-                <option value="">Todas las prioridades</option>
-                {% for value, label in priority_choices %}
-                    <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-            <select name="sort">
-                {% for value, label in sort_choices %}
-                    <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-            <input type="hidden" name="view" value="{{ view_mode }}">
-            <button type="submit" class="button subtle">Aplicar</button>
-        </form>
-        <form method="post" action="{% url 'saved_view_create' database.slug %}" class="toolbar top-gap">
-            {% csrf_token %}
-            <input type="hidden" name="query" value="{{ query }}">
-            <input type="hidden" name="priority" value="{{ selected_priority }}">
-            <input type="hidden" name="sort" value="{{ sort }}">
-            <input type="hidden" name="view_mode" value="{{ view_mode }}">
-            {{ save_view_form.name }}
-            <button type="submit" class="button subtle">Guardar esta vista</button>
-        </form>
-        <div class="view-switch">
-            <a class="pill {% if view_mode == 'table' %}is-active{% endif %}" href="?tab=records&mode={{ mode }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view=table">Tabla</a>
-            <a class="pill {% if view_mode == 'cards' %}is-active{% endif %}" href="?tab=records&mode={{ mode }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view=cards">Tarjetas</a>
-        </div>
-        {% if view_mode == 'cards' %}
-            <div class="record-card-grid">
-                {% for record in records %}
-                    <article class="record-card">
-                        <div class="member-row">
-                            <h3><a href="{% url 'record_detail' database.slug record.pk %}">{{ record.title }}</a></h3>
-                            <span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span>
-                        </div>
-                        <div class="record-meta">
-                            {% for field in table_fields %}
-                                <div class="record-meta-row">
-                                    <span>{{ field.label }}</span>
-                                    <strong>{{ record|display_value:field|default:"-" }}</strong>
-                                </div>
-                            {% endfor %}
-                        </div>
-                        <div class="hero-actions">
-                            <a href="{% url 'record_edit' database.slug record.pk %}">Editar</a>
-                            <a href="{% url 'record_delete' database.slug record.pk %}">Eliminar</a>
-                        </div>
-                    </article>
-                {% empty %}
-                    <div class="empty-state">
-                        <h3>Todavia no hay registros cargados</h3>
-                        <p>Puedes crear uno manualmente o importar un CSV.</p>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Registro</th>
-                            <th>Prioridad</th>
-                            {% for field in table_fields %}
-                                <th>{{ field.label }}</th>
-                            {% endfor %}
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                {% if view_mode == 'cards' %}
+                    <div class="record-card-grid">
                         {% for record in records %}
-                            <tr>
-                                <td><a href="{% url 'record_detail' database.slug record.pk %}">{{ record.title }}</a></td>
-                                <td><span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span></td>
-                                {% for field in table_fields %}
-                                    <td>{{ record|display_value:field }}</td>
-                                {% endfor %}
-                                <td class="actions">
+                            <article class="record-card">
+                                <div class="member-row">
+                                    <div>
+                                        <span class="pill">ID {{ record.pk }}</span>
+                                        <h3><a href="{% url 'record_detail' database.slug record.pk %}">{{ record.title }}</a></h3>
+                                    </div>
+                                    {% if has_priority %}
+                                        <span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="record-meta">
+                                    {% for field in table_fields %}
+                                        <div class="record-meta-row">
+                                            <span>{{ field.label }}</span>
+                                            <strong>
+                                                {% if field.field_type == 'relation' %}
+                                                    {% with preview_key=record|relation_preview_key:field %}
+                                                        {% with preview=relation_previews|get_item:preview_key %}
+                                                            {% if preview %}
+                                                                <button type="button" class="relation-chip" data-relation-preview-key="{{ preview_key }}">{{ record|display_value:field|default:"-" }}</button>
+                                                            {% else %}
+                                                                {{ record|display_value:field|default:"-" }}
+                                                            {% endif %}
+                                                        {% endwith %}
+                                                    {% endwith %}
+                                                {% else %}
+                                                    {{ record|display_value:field|default:"-" }}
+                                                {% endif %}
+                                            </strong>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="hero-actions">
                                     <a href="{% url 'record_edit' database.slug record.pk %}">Editar</a>
                                     <a href="{% url 'record_delete' database.slug record.pk %}">Eliminar</a>
-                                </td>
-                            </tr>
+                                </div>
+                            </article>
                         {% empty %}
-                            <tr>
-                                <td colspan="99">Todavia no hay registros cargados.</td>
-                            </tr>
+                            <div class="empty-state">
+                                <h3>Todavia no hay registros cargados</h3>
+                                <p>Puedes crear uno manualmente o importar un CSV.</p>
+                            </div>
                         {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endif %}
-        {% if page_obj.paginator.num_pages > 1 %}
-            <div class="pagination">
-                {% if page_obj.has_previous %}
-                    <a class="button subtle" href="?tab=records&mode={{ mode }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view={{ view_mode }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+                    </div>
+                {% else %}
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Registro</th>
+                                    {% if has_priority %}<th>Prioridad</th>{% endif %}
+                                    {% for field in table_fields %}
+                                        <th>{{ field.label }}</th>
+                                    {% endfor %}
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in records %}
+                                    <tr>
+                                        <td>{{ record.pk }}</td>
+                                        <td><a href="{% url 'record_detail' database.slug record.pk %}">{{ record.title }}</a></td>
+                                        {% if has_priority %}<td><span class="pill priority-{{ record.priority }}">{{ record.get_priority_display }}</span></td>{% endif %}
+                                        {% for field in table_fields %}
+                                            <td>
+                                                {% if field.field_type == 'relation' %}
+                                                    {% with preview_key=record|relation_preview_key:field %}
+                                                        {% with preview=relation_previews|get_item:preview_key %}
+                                                            {% if preview %}
+                                                                <button type="button" class="relation-chip" data-relation-preview-key="{{ preview_key }}">{{ record|display_value:field }}</button>
+                                                            {% else %}
+                                                                {{ record|display_value:field }}
+                                                            {% endif %}
+                                                        {% endwith %}
+                                                    {% endwith %}
+                                                {% else %}
+                                                    {{ record|display_value:field }}
+                                                {% endif %}
+                                            </td>
+                                        {% endfor %}
+                                        <td class="actions">
+                                            <a href="{% url 'record_edit' database.slug record.pk %}">Editar</a>
+                                            <a href="{% url 'record_delete' database.slug record.pk %}">Eliminar</a>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="99">Todavia no hay registros cargados.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 {% endif %}
-                <span class="pill is-active">Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
-                {% if page_obj.has_next %}
-                    <a class="button subtle" href="?tab=records&mode={{ mode }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view={{ view_mode }}&page={{ page_obj.next_page_number }}">Siguiente</a>
+                {% if page_obj.paginator.num_pages > 1 %}
+                    <div class="pagination">
+                        {% if page_obj.has_previous %}
+                            <a class="button subtle" href="?tab=records&record_id={{ selected_record_id }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view={{ view_mode }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+                        {% endif %}
+                        <span class="pill is-active">Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+                        {% if page_obj.has_next %}
+                            <a class="button subtle" href="?tab=records&record_id={{ selected_record_id }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view={{ view_mode }}&page={{ page_obj.next_page_number }}">Siguiente</a>
+                        {% endif %}
+                    </div>
                 {% endif %}
             </div>
-        {% endif %}
+
+            <aside class="records-side">
+                <div class="panel-head">
+                    <h2>Buscar y operar elementos</h2>
+                    <p>Filtros, vistas guardadas y acciones rapidas en una columna lateral.</p>
+                </div>
+                <div class="hero-actions records-side-actions">
+                    <a class="button" href="{% url 'record_create' database.slug %}">Agregar registro</a>
+                </div>
+                {% if import_summary %}
+                    <div class="import-summary">
+                        <div class="record-meta">
+                            <div class="record-meta-row"><span>Filas detectadas</span><strong>{{ import_summary.total_rows }}</strong></div>
+                            <div class="record-meta-row"><span>Filas importadas</span><strong>{{ import_summary.imported }}</strong></div>
+                            <div class="record-meta-row"><span>Filas omitidas</span><strong>{{ import_summary.skipped }}</strong></div>
+                        </div>
+                        {% if import_summary.errors %}
+                            <div class="tag-list">
+                                {% for item in import_summary.errors %}
+                                    <span class="tag">{{ item }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+                <form method="get" class="toolbar toolbar-vertical top-gap">
+                    <input type="hidden" name="tab" value="records">
+                    <input type="text" name="record_id" value="{{ selected_record_id }}" placeholder="ID exacto">
+                    <input type="text" name="q" value="{{ query }}" placeholder="Buscar por nombre o contenido...">
+                    {% if has_priority %}
+                        <select name="priority">
+                            <option value="">Todas las prioridades</option>
+                            {% for value, label in priority_choices %}
+                                <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    {% endif %}
+                    <select name="sort">
+                        {% for value, label in sort_choices %}
+                            <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="view" value="{{ view_mode }}">
+                    <button type="submit" class="button subtle">Aplicar</button>
+                </form>
+            </aside>
+        </div>
     </section>
+    <div class="related-preview-card" id="related-preview-card" hidden>
+        <div class="related-preview-backdrop" data-related-preview-close></div>
+        <div class="related-preview-panel">
+            <div class="member-row">
+                <div>
+                    <span class="eyebrow" id="related-preview-db">Relacion</span>
+                    <h3 id="related-preview-title">Registro relacionado</h3>
+                </div>
+                <button type="button" class="modal-close-button" aria-label="Cerrar" data-related-preview-close>X</button>
+            </div>
+            <div class="record-meta" id="related-preview-fields"></div>
+            <div class="hero-actions" id="related-preview-actions">
+                <a class="button subtle" id="related-preview-open" href="#">Abrir registro</a>
+                <a class="button subtle" id="related-preview-edit" href="#">Editar</a>
+            </div>
+        </div>
+    </div>
+    {{ relation_previews|json_script:"relation-previews-data" }}
+    <script>
+        (() => {
+            const previewsNode = document.getElementById("relation-previews-data");
+            const relationPreviews = previewsNode ? JSON.parse(previewsNode.textContent) : {};
+            const relationButtons = Array.from(document.querySelectorAll("[data-relation-preview-key]"));
+            const previewCard = document.getElementById("related-preview-card");
+            if (!relationButtons.length || !previewCard) {
+                return;
+            }
+            const previewDb = document.getElementById("related-preview-db");
+            const previewTitle = document.getElementById("related-preview-title");
+            const previewFields = document.getElementById("related-preview-fields");
+            const previewOpen = document.getElementById("related-preview-open");
+            const previewEdit = document.getElementById("related-preview-edit");
+
+            const closePreview = () => {
+                previewCard.hidden = true;
+            };
+
+            relationButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    const payload = relationPreviews[button.dataset.relationPreviewKey];
+                    if (!payload) {
+                        return;
+                    }
+                    previewDb.textContent = payload.database_name || "Relacion";
+                    previewTitle.textContent = payload.title || "Registro relacionado";
+                    previewFields.innerHTML = "";
+                    (payload.fields || []).forEach((item) => {
+                        const row = document.createElement("div");
+                        row.className = "record-meta-row";
+                        row.innerHTML = `<span>${item.label}</span><strong>${item.value}</strong>`;
+                        previewFields.appendChild(row);
+                    });
+                    if (payload.detail_url) {
+                        previewOpen.href = payload.detail_url;
+                        previewOpen.hidden = false;
+                    } else {
+                        previewOpen.hidden = true;
+                    }
+                    if (payload.edit_url) {
+                        previewEdit.href = payload.edit_url;
+                        previewEdit.hidden = false;
+                    } else {
+                        previewEdit.hidden = true;
+                    }
+                    previewCard.hidden = false;
+                });
+            });
+
+            document.querySelectorAll("[data-related-preview-close]").forEach((item) => {
+                item.addEventListener("click", closePreview);
+            });
+        })();
+    </script>
 {% endif %}
 
 {% if active_tab == 'structure' %}
     <section class="structure-shell">
         <article class="panel">
+            {% if all_fields %}
+                <section class="structure-primary-card">
+                    <div>
+                        <span class="eyebrow">Registro</span>
+                        <h3>Columna que identifica cada registro</h3>
+                        <p>
+                            El nombre visible de cada registro hoy sale de
+                            <strong>{{ primary_field.label|default:"el primer campo" }}</strong>.
+                            Puedes cambiarlo en cualquier momento.
+                        </p>
+                    </div>
+                    {% if membership.role == 'admin' %}
+                        <form method="post" action="{% url 'field_set_primary_select' database.slug %}" class="structure-primary-picker">
+                            {% csrf_token %}
+                            <label class="field">
+                                <span>Usar esta columna como nombre del registro</span>
+                                <select name="primary_field_id">
+                                    {% for field in all_fields %}
+                                        <option value="{{ field.pk }}" {% if field.is_primary %}selected{% endif %}>{{ field.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                            <button type="submit" class="button subtle">Actualizar columna</button>
+                        </form>
+                    {% else %}
+                        <span class="pill is-active">{{ primary_field.label|default:"Sin definir" }}</span>
+                    {% endif %}
+                </section>
+            {% endif %}
             <div class="panel-head">
                 <h2>Mapa visual de la base</h2>
                 <p>Revisa rapidamente que tipos de campo tienes y donde hay listas o relaciones.</p>
@@ -265,7 +405,7 @@
             </div>
             <div class="structure-grid">
                 {% for item in field_cards %}
-                    <article class="field-card {% if item.is_editing %}field-card-editing{% endif %}">
+                    <article class="field-card" id="field-card-{{ item.field.pk }}">
                         <div class="member-row">
                             <div>
                                 <strong>{{ item.field.label }}</strong>
@@ -275,6 +415,7 @@
                         </div>
                         <p>{{ item.field.help_text|default:"Sin ayuda configurada." }}</p>
                         <div class="tag-list">
+                            {% if item.field.is_primary %}<span class="tag">Nombre visible del registro</span>{% endif %}
                             {% if item.field.required %}<span class="tag">Obligatorio</span>{% endif %}
                             {% if item.field.show_in_table %}<span class="tag">Visible en tabla</span>{% endif %}
                             {% if item.has_data %}<span class="tag">Tiene datos cargados</span>{% endif %}
@@ -289,15 +430,15 @@
                         </div>
                         <div class="field-card-actions">
                             {% if membership.role == 'admin' %}
-                                <a class="pill is-active" href="?tab=structure&mode={{ mode }}&edit_field={{ item.field.pk }}">Editar</a>
+                                <button type="button" class="pill is-active inline-toggle-button" data-toggle-target="field-editor-{{ item.field.pk }}">Editar</button>
                                 <form method="post" action="{% url 'field_delete' database.slug item.field.pk %}">
                                     {% csrf_token %}
                                     <button type="submit" class="field-delete-button">Eliminar</button>
                                 </form>
                             {% endif %}
                         </div>
-                        {% if membership.role == 'admin' and item.is_editing %}
-                            <form method="post" action="{% url 'field_update' database.slug item.field.pk %}" class="stack-form compact field-editor-inline">
+                        {% if membership.role == 'admin' %}
+                            <form method="post" action="{% url 'field_update' database.slug item.field.pk %}" class="stack-form compact field-editor-inline inline-expander" id="field-editor-{{ item.field.pk }}">
                                 {% csrf_token %}
                                 {% if item.has_data %}
                                     <div class="empty-state">
@@ -306,7 +447,7 @@
                                     </div>
                                 {% endif %}
                                 {% for field in item.form %}
-                                    <label class="field">
+                                    <label class="field {% if field.name == 'options_text' %}field-conditional field-conditional-options{% elif field.name == 'relation_database' %}field-conditional field-conditional-relation{% endif %}">
                                         <span>{{ field.label }}</span>
                                         {{ field }}
                                     {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
@@ -322,7 +463,7 @@
                                 </div>
                                 <div class="hero-actions">
                                     <button type="submit" class="button">Guardar cambios</button>
-                                    <a class="button subtle" href="?tab=structure&mode={{ mode }}">Cancelar</a>
+                                    <button type="button" class="button subtle inline-toggle-button" data-toggle-target="field-editor-{{ item.field.pk }}">Cancelar</button>
                                 </div>
                             </form>
                         {% endif %}
@@ -342,11 +483,14 @@
                 <p>{% if membership.role == 'admin' %}Crea campos, listas o relaciones con un formulario guiado.{% else %}Solo los administradores pueden cambiar la estructura.{% endif %}</p>
             </div>
             {% if membership.role == 'admin' %}
-                <form method="post" action="{% url 'field_create' database.slug %}" class="stack-form compact">
+                <div class="hero-actions">
+                    <button type="button" class="button" data-toggle-target="new-field-form">Agregar campo o relacion</button>
+                </div>
+                <form method="post" action="{% url 'field_create' database.slug %}" class="stack-form compact inline-expander top-gap" id="new-field-form">
                     {% csrf_token %}
                     <h3>Agregar campo o relacion</h3>
                     {% for field in field_form %}
-                        <label class="field">
+                        <label class="field {% if field.name == 'options_text' %}field-conditional field-conditional-options{% elif field.name == 'relation_database' %}field-conditional field-conditional-relation{% endif %}">
                             <span>{{ field.label }}</span>
                             {{ field }}
                             {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
@@ -355,19 +499,56 @@
                     {% endfor %}
                     <div class="form-preview-inline">
                         <h4>Vista previa del formulario</h4>
-                        <div class="field">
-                            <span>Nombre principal</span>
-                            <input type="text" placeholder="Ejemplo de carga simple">
-                        </div>
-                        {% for field in basic_fields_preview %}
+                        {% for field in all_fields|slice:":4" %}
                             <div class="field">
                                 <span>{{ field.label }}</span>
                                 <input type="text" placeholder="{{ field.help_text|default:'Dato esperado' }}">
                             </div>
                         {% endfor %}
                     </div>
-                    <button type="submit" class="button">Guardar campo</button>
+                    <div class="hero-actions">
+                        <button type="submit" class="button">Guardar campo</button>
+                        <button type="button" class="button subtle" data-toggle-target="new-field-form">Cancelar</button>
+                    </div>
                 </form>
+                <script>
+                    (() => {
+                        const syncExpanderState = (element, shouldOpen) => {
+                            element.classList.toggle("is-open", shouldOpen);
+                        };
+
+                        document.querySelectorAll("[data-toggle-target]").forEach((button) => {
+                            button.addEventListener("click", () => {
+                                const target = document.getElementById(button.dataset.toggleTarget);
+                                if (!target) {
+                                    return;
+                                }
+                                syncExpanderState(target, !target.classList.contains("is-open"));
+                            });
+                        });
+
+                        const bindConditionalFields = (root) => {
+                            const typeSelect = root.querySelector("[data-field-type-control]");
+                            const optionsWrapper = root.querySelector(".field-conditional-options");
+                            const relationWrapper = root.querySelector(".field-conditional-relation");
+                            if (!typeSelect) {
+                                return;
+                            }
+                            const syncVisibility = () => {
+                                if (optionsWrapper) {
+                                    optionsWrapper.hidden = typeSelect.value !== "select";
+                                }
+                                if (relationWrapper) {
+                                    relationWrapper.hidden = typeSelect.value !== "relation";
+                                }
+                            };
+                            typeSelect.addEventListener("change", syncVisibility);
+                            syncVisibility();
+                        };
+
+                        document.querySelectorAll("form.stack-form").forEach(bindConditionalFields);
+                    })();
+                </script>
             {% else %}
                 <div class="empty-state">
                     <h3>Edicion bloqueada</h3>

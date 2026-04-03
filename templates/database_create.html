@@ -89,7 +89,7 @@
                 <div class="wizard-structure-builder">
                     <div class="field">
                         <span>{{ options_form.selected_fields.label }}</span>
-                        <small>Los campos propios de la plantilla ya vienen marcados. Puedes desactivar algunos, sumar extras o agregar uno propio con el botón final. Todo esto podrás cambiarlo más adelante.</small>
+                        <small>Los campos propios de la plantilla ya vienen marcados. Puedes desactivar algunos, sumar extras o agregar uno propio con el boton final. El primer campo activo sera el nombre visible de cada registro, y luego podras cambiar la estructura si lo necesitas.</small>
                         <div class="field-selection-grid">
                             {% for checkbox in options_form.selected_fields %}
                                 <label class="field-pick-card {% if checkbox.data.value in base_field_keys %}is-base{% else %}is-extra{% endif %}">
@@ -99,7 +99,7 @@
                                     {% for item in field_option_catalog %}
                                         {% if item.key == checkbox.data.value %}
                                             <small>
-                                                {% if item.kind == 'base' %}Campo base de la plantilla.{% else %}Extra recomendado opcional.{% endif %}
+                                                {% if item.kind == 'base' %}Campo base de la plantilla.{% elif item.kind == 'system' %}Herramienta opcional para destacar elementos.{% else %}Extra recomendado opcional.{% endif %}
                                                 {{ item.help_text }}
                                             </small>
                                         {% endif %}
@@ -255,7 +255,7 @@
                     </div>
                 </div>
                 <div class="hero-actions">
-                    <a class="button subtle" href="?step=3&starter_template={{ wizard_state.starter_template }}&use_case={{ wizard_state.use_case }}&name={{ wizard_state.name|urlencode }}&description={{ wizard_state.description|urlencode }}">Volver</a>
+                    <button type="submit" name="nav" value="back" formaction="{% url 'database_create' %}" class="button subtle">Volver</button>
                     <button type="submit" class="button">Crear base de datos</button>
                 </div>
             </form>
@@ -281,7 +281,7 @@
             </div>
             <div class="assistant-note">
                 <strong>Qué recomienda</strong>
-                <p>Nombre claro, estructura base, extras comunes, ejemplos opcionales y un modo de uso inicial.</p>
+                <p>Nombre claro, estructura base, extras comunes y ejemplos opcionales para arrancar mejor.</p>
             </div>
             <div class="assistant-note">
                 <strong>Por qué es útil</strong>

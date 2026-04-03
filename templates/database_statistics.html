@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Graficos y estadisticas{% endblock %}
+
+{% block content %}
+<section class="dashboard-header">
+    <div>
+        <span class="eyebrow">{{ database.name }}</span>
+        <h1>Graficos y estadisticas</h1>
+        <p>Esta vista va a concentrar los analisis visuales de la base para entender tendencias, volumenes y distribuciones sin salir del sistema.</p>
+    </div>
+    <div class="hero-actions">
+        <a class="button subtle" href="{% url 'database_detail' database.slug %}?tab=summary">Volver al resumen</a>
+    </div>
+</section>
+
+<section class="detail-grid">
+    <article class="panel">
+        <div class="panel-head">
+            <h2>Coming soon</h2>
+            <p>La seccion ya queda reservada para la capa analitica del producto, pero todavia no calcula graficos reales.</p>
+        </div>
+        <div class="record-meta">
+            <div class="record-meta-row"><span>Base analizada</span><strong>{{ database.name }}</strong></div>
+            <div class="record-meta-row"><span>Registros disponibles</span><strong>{{ total_records }}</strong></div>
+            <div class="record-meta-row"><span>Campos potencialmente graficables</span><strong>{{ chart_ready_fields.count }}</strong></div>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-head">
+            <h2>Que vas a poder hacer aca</h2>
+            <p>La idea es que esta vista te permita elegir campos y ver estadisticas utiles sin configuraciones tecnicas.</p>
+        </div>
+        <div class="stack-form compact">
+            <article class="database-card">
+                <h3>Graficos por campo</h3>
+                <p>Seleccionar un campo y ver barras, tortas o series simples segun el tipo de dato.</p>
+            </article>
+            <article class="database-card">
+                <h3>Conteos y distribuciones</h3>
+                <p>Ver cuantos registros caen en cada estado, categoria, fecha o rango numerico.</p>
+            </article>
+            <article class="database-card">
+                <h3>Filtros previos al analisis</h3>
+                <p>Aplicar filtros guardados o condiciones antes de generar una visualizacion.</p>
+            </article>
+            <article class="database-card">
+                <h3>Resumenes reutilizables</h3>
+                <p>Guardar vistas analiticas frecuentes para volver a ellas sin reconfigurar todo.</p>
+            </article>
+        </div>
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Campos que podran alimentar estadisticas</h2>
+        <p>Estos son los campos actuales de la base que mejor encajan con futuros graficos y agregaciones.</p>
+    </div>
+    <div class="tag-list">
+        {% for field in chart_ready_fields %}
+            <span class="tag">{{ field.label }} · {{ field.get_field_type_display }}</span>
+        {% empty %}
+            <span class="tag">Todavia no hay campos pensados para estadisticas</span>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

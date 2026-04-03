@@ -10,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.core.exceptions import ValidationError
 from django.db.models import Max
+from django.urls import reverse
 from django.utils.text import slugify
 
 from django.conf import settings
@@ -18,6 +19,11 @@ from .models import AppDatabase, CustomField, DatabaseMembership, Record, SavedV
 
 
 User = get_user_model()
+
+
+class RelationRecordChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return f"#{obj.pk} - {obj.title}"
 
 
 class LoginForm(AuthenticationForm):
@@ -91,7 +97,7 @@ class WizardTemplateForm(forms.Form):
 
 
 class WizardSetupForm(forms.Form):
-    name = forms.CharField(label="Nombre de tu lista", max_length=120)
+    name = forms.CharField(label="Nombre de tu base", max_length=120)
     description = forms.CharField(
         label="Para que la vas a usar",
         required=False,
@@ -119,6 +125,7 @@ class WizardOptionsForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        selected_fields = cleaned_data.get("selected_fields") or []
         custom_fields = []
         raw_custom_fields = cleaned_data.get("custom_fields_json") or "[]"
         try:
@@ -152,6 +159,9 @@ class WizardOptionsForm(forms.Form):
                     "options_text": options_text,
                 }
             )
+        selected_non_system_fields = [value for value in selected_fields if value != "__priority__"]
+        if not selected_non_system_fields and not custom_fields:
+            raise ValidationError("Selecciona al menos un campo para identificar tus registros o agrega uno propio.")
         cleaned_data["custom_fields"] = custom_fields
         return cleaned_data
 
@@ -166,8 +176,10 @@ class SaveViewForm(forms.ModelForm):
 class CSVMappingForm(forms.Form):
     def __init__(self, database, headers, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        choices = [("__ignore__", "Ignorar"), ("title", "Nombre principal"), ("priority", "Prioridad")]
+        choices = [("__ignore__", "Ignorar")]
         choices += [(field.key, field.label) for field in database.fields.all()]
+        if database.has_priority:
+            choices.append(("priority", "Prioridad"))
         for header in headers:
             self.fields[f"map_{header}"] = forms.ChoiceField(
                 label=header,
@@ -220,7 +232,8 @@ class CSVImportForm(forms.Form):
         buffer = io.StringIO(content)
         sample = content[:2048]
         try:
-            dialect = csv.Sniffer().sniff(sample or "title,priority")
+            fallback_sample = ",".join([field.key for field in self.database.fields.all()[:2]]) or "nombre"
+            dialect = csv.Sniffer().sniff(sample or fallback_sample)
         except csv.Error:
             dialect = csv.excel
 
@@ -233,7 +246,9 @@ class CSVImportForm(forms.Form):
             return
 
         reader = csv.reader(buffer, dialect=dialect)
-        fields = ["title", "priority"] + [field.key for field in self.database.fields.all()]
+        fields = [field.key for field in self.database.fields.all()]
+        if self.database.has_priority:
+            fields.append("priority")
         for row in reader:
             mapped = {}
             for index, key in enumerate(fields):
@@ -279,8 +294,14 @@ class CustomFieldForm(forms.ModelForm):
         if self.actor:
             relation_queryset = relation_queryset.filter(memberships__user=self.actor).distinct()
         self.fields["relation_database"].queryset = relation_queryset
+        self.fields["field_type"].widget.attrs["data-field-type-control"] = "true"
+        self.fields["options_text"].widget.attrs["data-options-input"] = "true"
+        self.fields["relation_database"].widget.attrs["data-relation-input"] = "true"
         self.fields["options_text"].help_text = "Solo para campos de seleccion. Una opcion por linea."
-        self.fields["relation_database"].help_text = "Solo para campos de relacion. Elegi la base a la que vas a apuntar."
+        if relation_queryset.exists():
+            self.fields["relation_database"].help_text = "Solo para campos de relacion. Elige una de tus otras bases para vincular registros."
+        else:
+            self.fields["relation_database"].help_text = "Todavia no tienes otra base disponible para relacionar. Crea otra base primero y luego vuelve a este campo."
 
     def _field_has_existing_data(self):
         if not self.instance.pk:
@@ -297,6 +318,7 @@ class CustomFieldForm(forms.ModelForm):
         options_text = (cleaned_data.get("options_text") or "").strip()
         relation_database = cleaned_data.get("relation_database")
         previous_type = self.instance.field_type if self.instance.pk else None
+        previous_relation_database_id = self.instance.relation_database_id if self.instance.pk else None
 
         if field_type == CustomField.FieldType.SELECT and not options_text:
             self.add_error("options_text", "Define al menos una opcion para este campo.")
@@ -312,6 +334,17 @@ class CustomFieldForm(forms.ModelForm):
             self.add_error(
                 "field_type",
                 "No puedes cambiar el tipo de un campo que ya tiene datos. Crea uno nuevo o vacia los registros primero.",
+            )
+        if (
+            self.instance.pk
+            and previous_type == CustomField.FieldType.RELATION
+            and field_type == CustomField.FieldType.RELATION
+            and previous_relation_database_id != getattr(relation_database, "pk", None)
+            and self._field_has_existing_data()
+        ):
+            self.add_error(
+                "relation_database",
+                "No puedes cambiar la base relacionada de un campo que ya tiene datos. Crea uno nuevo o limpia esos registros primero.",
             )
         if field_type != CustomField.FieldType.SELECT:
             cleaned_data["options_text"] = ""
@@ -357,18 +390,17 @@ class MembershipForm(forms.Form):
 
 
 class RecordForm(forms.Form):
-    title = forms.CharField(label="Nombre del registro", max_length=160)
-    priority = forms.ChoiceField(label="Prioridad", choices=Record.Priority.choices)
-
     def __init__(self, database, *args, record=None, actor=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.database = database
         self.record = record
         self.actor = actor
+        self.primary_field = database.get_primary_field()
 
-        if record:
-            self.fields["title"].initial = record.title
-            self.fields["priority"].initial = record.priority
+        if database.has_priority:
+            self.fields["priority"] = forms.ChoiceField(label="Prioridad", choices=Record.Priority.choices)
+            if record:
+                self.fields["priority"].initial = record.priority
 
         for field in database.fields.all():
             self.fields[field.key] = self._build_form_field(field)
@@ -407,12 +439,28 @@ class RecordForm(forms.Form):
                 and self.actor
                 and custom_field.relation_database.memberships.filter(user=self.actor).exists()
             ):
-                queryset = custom_field.relation_database.records.all()
-            return forms.ModelChoiceField(
+                queryset = custom_field.relation_database.records.order_by("title", "pk")
+            relation_common = common.copy()
+            relation_common["help_text"] = (
+                f"{custom_field.help_text} Elige un registro de {custom_field.relation_database.name}."
+                if custom_field.help_text and custom_field.relation_database
+                else f"Elige un registro de {custom_field.relation_database.name}."
+                if custom_field.relation_database
+                else custom_field.help_text
+            )
+            field = RelationRecordChoiceField(
                 queryset=queryset,
                 empty_label="Selecciona un registro",
-                **common,
+                **relation_common,
             )
+            if custom_field.relation_database:
+                field.widget.attrs["data-relation-field-key"] = custom_field.key
+                field.widget.attrs["data-relation-create-url"] = reverse(
+                    "record_create",
+                    args=[custom_field.relation_database.slug],
+                )
+                field.widget.attrs["data-relation-create-label"] = f"+ Agregar nuevo en {custom_field.relation_database.name}"
+            return field
         return forms.CharField(**common)
 
     def clean(self):
@@ -434,13 +482,30 @@ class RecordForm(forms.Form):
                 data[field.key] = str(value.pk)
             else:
                 data[field.key] = value
+        if not self.primary_field:
+            raise ValidationError("Esta base no tiene un campo principal definido. Agrega al menos un campo antes de cargar registros.")
+        title_value = cleaned_data.get(self.primary_field.key)
+        if title_value in ("", None):
+            self.add_error(self.primary_field.key, "Este campo se usa como nombre visible del registro.")
+        cleaned_data["record_title"] = self._format_title_value(self.primary_field, title_value)
         cleaned_data["record_data"] = data
         return cleaned_data
 
+    def _format_title_value(self, field, value):
+        if value in ("", None):
+            return ""
+        if field.field_type == CustomField.FieldType.BOOLEAN:
+            return "Si" if value else "No"
+        if field.field_type == CustomField.FieldType.DATE:
+            return value.isoformat()
+        if field.field_type == CustomField.FieldType.RELATION:
+            return value.title
+        return str(value).strip()
+
     def save(self, user):
         record = self.record or Record(database=self.database, created_by=user)
-        record.title = self.cleaned_data["title"]
-        record.priority = self.cleaned_data["priority"]
+        record.title = self.cleaned_data["record_title"]
+        record.priority = self.cleaned_data.get("priority") or Record.Priority.NORMAL
         record.data = self.cleaned_data["record_data"]
         record.updated_by = user
         record.save()

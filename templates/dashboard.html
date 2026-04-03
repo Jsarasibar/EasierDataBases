@@ -7,7 +7,7 @@
     <div>
         <span class="eyebrow">Centro de inicio</span>
         <h1>Hola, {{ request.user.first_name|default:request.user.username }}</h1>
-        <p>Elige que quieres hacer: crear una lista, seguir tareas del dia o abrir una base existente.</p>
+        <p>Elige que quieres hacer: crear una base, seguir tareas del dia o abrir una base existente.</p>
     </div>
     <a class="button" href="{% url 'database_create' %}">Nueva base</a>
 </section>
@@ -25,14 +25,36 @@
     </div>
     <div class="database-grid">
         <a class="database-card" href="{% url 'database_create' %}">
-            <h3>Crear una lista nueva</h3>
+            <h3>Crear una base nueva</h3>
             <p>Empieza con una plantilla y ejemplos cargados.</p>
         </a>
         {% for membership in memberships|slice:":2" %}
-            <a class="database-card" href="{% url 'database_detail' membership.database.slug %}?tab=daily">
-                <h3>Trabajar hoy en {{ membership.database.name }}</h3>
-                <p>Ir directo a pendientes, urgentes y carga rapida.</p>
+            <a class="database-card" href="{% url 'database_detail' membership.database.slug %}?tab=records">
+                <h3>Abrir {{ membership.database.name }}</h3>
+                <p>Entra directo a registros para buscar, filtrar y agregar informacion.</p>
             </a>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Tus bases</h2>
+        <p>Cada base tiene campos personalizados, permisos y registros editables.</p>
+    </div>
+    <div class="database-grid">
+        {% for membership in memberships %}
+            <a class="database-card" href="{% url 'database_detail' membership.database.slug %}?tab=records">
+                <span class="pill">{{ membership.get_role_display }}</span>
+                <h3>{{ membership.database.name }}</h3>
+                <p>{{ membership.database.description|default:"Sin descripcion por ahora." }}</p>
+                <small>{{ membership.database.get_use_case_display }}</small>
+            </a>
+        {% empty %}
+            <div class="empty-state">
+                <h3>Todavia no hay bases creadas</h3>
+                <p>Crea tu primera base para comenzar a organizar tu informacion.</p>
+            </div>
         {% endfor %}
     </div>
 </section>
@@ -68,28 +90,6 @@
             <div class="empty-state">
                 <h3>Todavia no hay actividad</h3>
                 <p>Crea una base con datos de ejemplo para ver esta seccion en accion.</p>
-            </div>
-        {% endfor %}
-    </div>
-</section>
-
-<section class="panel">
-    <div class="panel-head">
-        <h2>Tus bases</h2>
-        <p>Cada base tiene campos personalizados, permisos y registros editables.</p>
-    </div>
-    <div class="database-grid">
-        {% for membership in memberships %}
-            <a class="database-card" href="{% url 'database_detail' membership.database.slug %}">
-                <span class="pill">{{ membership.get_role_display }}</span>
-                <h3>{{ membership.database.name }}</h3>
-                <p>{{ membership.database.description|default:"Sin descripcion por ahora." }}</p>
-                <small>{{ membership.database.get_use_case_display }}</small>
-            </a>
-        {% empty %}
-            <div class="empty-state">
-                <h3>Todavia no hay bases creadas</h3>
-                <p>Crea tu primera base para comenzar a organizar tu información.</p>
             </div>
         {% endfor %}
     </div>
