@@ -37,18 +37,21 @@
     </div>
 </section>
 
-<section class="panel">
-    <div class="panel-head">
+<section class="panel dashboard-primary-panel">
+    <div class="panel-head dashboard-primary-head">
         <h2>Tus bases</h2>
-        <p>Cada base tiene campos personalizados, permisos y registros editables.</p>
+        <p>Este es el centro real de trabajo: entra a una base para operar registros, ajustar estructura o seguir el historial.</p>
     </div>
-    <div class="database-grid">
+    <div class="database-grid database-grid-featured">
         {% for membership in memberships %}
-            <a class="database-card" href="{% url 'database_detail' membership.database.slug %}?tab=records">
+            <a class="database-card database-card-featured" href="{% url 'database_detail' membership.database.slug %}?tab=records">
                 <span class="pill">{{ membership.get_role_display }}</span>
                 <h3>{{ membership.database.name }}</h3>
                 <p>{{ membership.database.description|default:"Sin descripcion por ahora." }}</p>
-                <small>{{ membership.database.get_use_case_display }}</small>
+                <div class="database-card-meta">
+                    <small>{{ membership.database.get_use_case_display }}</small>
+                    <span class="button subtle">Abrir base</span>
+                </div>
             </a>
         {% empty %}
             <div class="empty-state">

@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}EasierDataBases{% endblock %}</title>
+    <script>
+        (() => {
+            const storedTheme = localStorage.getItem("edb-theme");
+            const theme = storedTheme || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+            document.documentElement.dataset.theme = theme;
+        })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -12,10 +19,11 @@
     <link rel="stylesheet" href="{% static 'styles/app.css' %}">
 </head>
 <body>
-    <div class="page-shell">
-        <header class="site-header">
+    <header class="site-header site-header-fixed">
+        <div class="site-header-inner">
             <a class="brand" href="{% url 'home' %}">EasierDataBases</a>
             <nav class="top-nav">
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Cambiar tema">Modo oscuro</button>
                 {% if request.user.is_authenticated %}
                     <a href="{% url 'dashboard' %}">Dashboard</a>
                     <form action="{% url 'logout' %}" method="post">
@@ -27,7 +35,9 @@
                     <a class="button subtle" href="{% url 'register' %}">Crear cuenta</a>
                 {% endif %}
             </nav>
-        </header>
+        </div>
+    </header>
+    <div class="page-shell">
 
         {% if messages %}
             <section class="messages">
@@ -41,5 +51,28 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+    <script>
+        (() => {
+            const root = document.documentElement;
+            const toggle = document.getElementById("theme-toggle");
+            if (!toggle) {
+                return;
+            }
+
+            const syncLabel = () => {
+                const isDark = root.dataset.theme === "dark";
+                toggle.textContent = isDark ? "Modo claro" : "Modo oscuro";
+                toggle.setAttribute("aria-label", isDark ? "Activar modo claro" : "Activar modo oscuro");
+            };
+
+            toggle.addEventListener("click", () => {
+                root.dataset.theme = root.dataset.theme === "dark" ? "light" : "dark";
+                localStorage.setItem("edb-theme", root.dataset.theme);
+                syncLabel();
+            });
+
+            syncLabel();
+        })();
+    </script>
 </body>
 </html>
