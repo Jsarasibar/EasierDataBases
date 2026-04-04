@@ -80,6 +80,7 @@ Casos de uso que hoy encajan bien:
 - Busqueda, filtros, orden, filtro por ID y paginacion.
 - Vista operativa centrada en `Registros`.
 - Pestaña `Trabajo diario`.
+- Dark mode global con persistencia entre paginas.
 
 ### Relaciones entre bases
 
@@ -107,6 +108,13 @@ Casos de uso que hoy encajan bien:
 - Restriccion de relaciones y registros segun acceso visible.
 - Eliminacion segura de bases con confirmacion explicita.
 
+### Historial y trazabilidad
+
+- Pestaña `Historial` por base.
+- Registro de movimientos con accion, usuario y fecha.
+- Tarjeta de detalle por movimiento.
+- Comparacion `antes / ahora` en cambios de registros.
+
 ### Vistas del producto
 
 Cada base esta organizada en pestañas para reducir complejidad:
@@ -116,6 +124,7 @@ Cada base esta organizada en pestañas para reducir complejidad:
 - `Resumen`
 - `Estructura`
 - `Gestion`
+- `Historial`
 
 Ademas existe una vista separada de `Estadisticas`, actualmente marcada como `Coming soon`.
 
@@ -355,12 +364,13 @@ El proyecto ya contempla:
 
 ## Experiencia actual del producto
 
-- El dashboard muestra accesos rapidos, las bases del usuario, ideas de arranque y actividad reciente.
+- El dashboard destaca `Tus bases` como bloque principal de trabajo, junto con accesos rapidos, ideas de arranque y actividad reciente.
 - Al entrar a una base, la vista inicial es `Registros`.
 - `Trabajo diario` concentra lo importante del dia.
 - `Resumen` muestra estado general y acceso a `Estadisticas`.
 - `Estructura` concentra configuracion de campos, relaciones y columna principal del registro.
 - `Gestion` reune importacion/exportacion y permisos.
+- `Historial` concentra trazabilidad y detalle de movimientos.
 
 ## Cobertura actual de tests
 
@@ -376,6 +386,8 @@ La suite automatizada cubre flujos centrales del MVP, incluyendo:
 - relaciones entre bases,
 - relaciones bidireccionales,
 - creacion inline de registros relacionados,
+- historial de movimientos,
+- detalle de cambios antes / despues en edicion de registros,
 - restricciones de acceso en relaciones,
 - renombre seguro de campos,
 - bloqueo de cambios destructivos,

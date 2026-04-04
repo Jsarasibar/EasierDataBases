@@ -37,6 +37,8 @@ Desde ahi puedes:
 - retomar registros recientes,
 - o inspirarte con ejemplos de uso.
 
+`Tus bases` es la seccion principal del dashboard y el punto mas importante del producto: desde ahi abres cada base para trabajar de verdad.
+
 ## 3. Crear una nueva base
 
 Desde el dashboard:
@@ -182,6 +184,19 @@ Aqui puedes:
 - exportar la base,
 - asignar roles a otras personas,
 - y, si eres administrador, eliminar la base con confirmacion segura.
+
+### Historial
+
+Esta pestaña muestra la trazabilidad de la base.
+
+Aqui puedes ver:
+
+- que movimiento se hizo,
+- quien lo hizo,
+- cuando ocurrio,
+- y abrir una tarjeta con mas detalle.
+
+En cambios de registros, el detalle tambien puede mostrar comparacion `antes / ahora`.
 
 ## 5. Crear registros manualmente
 
@@ -352,7 +367,19 @@ Ademas, en la tabla de `Registros`, si haces clic sobre el valor de un campo rel
 - algunos datos visibles,
 - acceso para abrirlo o editarlo.
 
-## 13. Importar datos desde CSV
+## 13. Usar modo oscuro
+
+En la barra superior veras un boton para cambiar el tema.
+
+Puedes:
+
+- activar modo oscuro,
+- volver a modo claro,
+- y el sistema recordara tu eleccion al navegar por la app.
+
+Esto afecta la landing, dashboard, bases, formularios, tablas y modales.
+
+## 14. Importar datos desde CSV
 
 Si ya tienes datos en Excel o en otra herramienta, puedes importarlos.
 
@@ -390,7 +417,7 @@ Al finalizar veras:
 
 En relaciones, la importacion puede resolver por ID o por nombre unico. Si hay duplicados, te pedira usar el ID.
 
-## 14. Exportar una base a CSV
+## 15. Exportar una base a CSV
 
 Para sacar una copia de tus datos:
 
@@ -402,7 +429,7 @@ Se descargara un archivo con:
 - todos los campos visibles de la base,
 - y `Prioridad` si esa base la usa.
 
-## 15. Compartir la base con otras personas
+## 16. Compartir la base con otras personas
 
 Si quieres trabajar con alguien mas:
 
@@ -426,7 +453,7 @@ Si quieres trabajar con alguien mas:
 - puede trabajar con registros,
 - pero no cambiar la estructura de la base.
 
-## 16. Editar un registro existente
+## 17. Editar un registro existente
 
 Para modificar datos ya cargados:
 
@@ -436,7 +463,9 @@ Para modificar datos ya cargados:
 4. Cambia los datos necesarios.
 5. Guarda.
 
-## 17. Eliminar un registro o una base
+Si luego vas a `Historial`, podras ver ese movimiento y, en muchos casos, revisar que cambio del valor anterior al nuevo.
+
+## 18. Eliminar un registro o una base
 
 ### Eliminar un registro
 
@@ -458,7 +487,7 @@ Si eres administrador:
 
 Esto evita borrados accidentales.
 
-## 18. Ver estadisticas
+## 19. Ver estadisticas
 
 En `Resumen` veras un acceso a `Graficos (estadisticas)`.
 
@@ -469,7 +498,26 @@ Hoy esa vista todavia no calcula estadisticas reales, pero anticipa lo que vendr
 - conteos,
 - y resumenes reutilizables.
 
-## 19. Consejos para empezar bien
+## 20. Revisar el historial de la base
+
+Si quieres controlar cambios o saber que paso:
+
+1. Entra en la base.
+2. Ve a `Historial`.
+3. Revisa la tabla de movimientos.
+4. Si quieres mas contexto, haz clic en `Ver detalle`.
+
+Que puedes encontrar ahi:
+
+- registros agregados,
+- registros editados,
+- registros eliminados,
+- cambios en estructura,
+- importaciones,
+- exportaciones,
+- y cambios de permisos.
+
+## 21. Consejos para empezar bien
 
 Si es tu primera base, conviene este orden:
 
@@ -481,7 +529,7 @@ Si es tu primera base, conviene este orden:
 6. Ajusta la estructura en `Estructura`.
 7. Importa un CSV real cuando ya entiendas el modelo.
 
-## 20. Buenas practicas
+## 22. Buenas practicas
 
 - Empieza simple. No intentes definir todo desde el primer dia.
 - Usa nombres de campos claros y cortos.
@@ -490,7 +538,7 @@ Si es tu primera base, conviene este orden:
 - Elige bien que columna identifica al registro.
 - Antes de importar muchos datos, prueba con un CSV chico.
 
-## 21. Que no hace todavia EasierDataBases
+## 23. Que no hace todavia EasierDataBases
 
 En esta version, la herramienta no incluye todavia:
 
@@ -503,7 +551,7 @@ En esta version, la herramienta no incluye todavia:
 
 La idea del producto hoy es resolver bien bases simples y operativas.
 
-## 22. Ejemplo de primer recorrido recomendado
+## 24. Ejemplo de primer recorrido recomendado
 
 Si quieres aprender rapido, prueba este caso:
 
@@ -536,7 +584,7 @@ Con estas dos bases puedes practicar:
 - filtros,
 - e importacion/exportacion.
 
-## 23. Resumen final
+## 25. Resumen final
 
 Con EasierDataBases puedes:
 
@@ -546,6 +594,8 @@ Con EasierDataBases puedes:
 - cargar y buscar registros,
 - relacionar informacion,
 - crear registros relacionados sin salir del flujo,
+- revisar el historial de movimientos,
+- usar la app en modo claro u oscuro,
 - importar y exportar CSV,
 - y trabajar con otras personas usando roles basicos.
 

@@ -1628,6 +1628,34 @@ body.modal-open {
     display: block;
 }
 
+.stats-bars {
+    display: grid;
+    gap: 14px;
+}
+
+.stats-bar-card {
+    padding: 16px 18px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-card);
+    background: var(--surface-strong);
+    box-shadow: var(--shadow);
+}
+
+.stats-bar-track {
+    height: 12px;
+    margin-top: 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: linear-gradient(180deg, #edf2f7 0%, #d9e1ea 100%);
+    overflow: hidden;
+}
+
+.stats-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent-dark) 100%);
+}
+
 @keyframes page-enter {
     from {
         opacity: 0;
@@ -1837,6 +1865,15 @@ html[data-theme="dark"] .empty-state {
 
 html[data-theme="dark"] .message {
     background: linear-gradient(180deg, #192838 0%, #121d2a 100%);
+}
+
+html[data-theme="dark"] .stats-bar-card {
+    background: linear-gradient(180deg, #1b2a3b 0%, #152231 100%);
+}
+
+html[data-theme="dark"] .stats-bar-track {
+    background: linear-gradient(180deg, #101925 0%, #182534 100%);
+    border-color: #60778d;
 }
 
 html[data-theme="dark"] .button:hover,

@@ -229,6 +229,50 @@ class DatabaseFlowTests(TestCase):
         self.assertContains(response, "Cliente A")
         self.assertContains(response, "admin")
 
+    def test_summary_tab_now_shows_statistics_analyzer(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(
+            name="Base analitica",
+            slug="base-analitica",
+            created_by=self.user,
+            has_priority=True,
+        )
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            required=True,
+            position=1,
+            is_primary=True,
+        )
+        Record.objects.create(
+            database=database,
+            title="Tarea A",
+            priority=Record.Priority.URGENT,
+            data={"nombre": "Tarea A"},
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        response = self.client.get(reverse("database_detail", args=[database.slug]), {"tab": "summary"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Analizador de campo")
+        self.assertContains(response, "Distribucion por prioridad")
+        self.assertContains(response, "Urgente")
+
+    def test_database_statistics_route_redirects_to_summary_tab(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base stats", slug="base-stats", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+
+        response = self.client.get(reverse("database_statistics", args=[database.slug]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("?tab=summary", response.url)
+
     def test_record_edit_activity_stores_before_and_after_changes(self):
         self.client.login(username="admin", password="secret123")
         database = AppDatabase.objects.create(
@@ -788,19 +832,19 @@ class DatabaseFlowTests(TestCase):
         self.assertContains(response, "Primer registro")
         self.assertNotContains(response, "Segundo registro")
 
-    def test_statistics_placeholder_view_is_available_from_summary(self):
+    def test_summary_statistics_replaces_old_placeholder(self):
         self.client.login(username="admin", password="secret123")
         database = AppDatabase.objects.create(name="Analitica", slug="analitica", created_by=self.user)
         DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
 
         summary_response = self.client.get(reverse("database_detail", args=[database.slug]), {"tab": "summary"})
         self.assertEqual(summary_response.status_code, 200)
-        self.assertContains(summary_response, "Graficos (estadisticas)")
+        self.assertContains(summary_response, "Analizador de campo")
+        self.assertContains(summary_response, "Que puedes leer aqui")
 
         stats_response = self.client.get(reverse("database_statistics", args=[database.slug]))
-        self.assertEqual(stats_response.status_code, 200)
-        self.assertContains(stats_response, "Coming soon")
-        self.assertContains(stats_response, "Graficos por campo")
+        self.assertEqual(stats_response.status_code, 302)
+        self.assertIn("?tab=summary", stats_response.url)
 
     def test_admin_can_update_existing_field(self):
         self.client.login(username="admin", password="secret123")

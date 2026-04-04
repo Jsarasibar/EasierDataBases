@@ -1,6 +1,8 @@
 import csv
 import json
 import logging
+from collections import Counter
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -208,6 +210,165 @@ def _history_payload_for_activity(activity):
         "created_at": activity.created_at.strftime("%d/%m/%Y %H:%M"),
         "summary": payload.get("summary", []),
         "changes": payload.get("changes", []),
+    }
+
+
+def _statistics_field_options(database):
+    options = [("__created_at__", "Registros creados")]
+    if database.has_priority:
+        options.append(("__priority__", "Prioridad"))
+    for field in database.fields.all():
+        if field.field_type in {
+            CustomField.FieldType.SELECT,
+            CustomField.FieldType.BOOLEAN,
+            CustomField.FieldType.RELATION,
+            CustomField.FieldType.NUMBER,
+            CustomField.FieldType.CURRENCY,
+            CustomField.FieldType.DATE,
+        }:
+            options.append((field.key, field.label))
+    return options
+
+
+def _default_statistics_field(database):
+    if database.has_priority:
+        return "__priority__"
+    first_chartable = next((value for value, _label in _statistics_field_options(database) if value != "__created_at__"), None)
+    return first_chartable or "__created_at__"
+
+
+def _statistics_bar_items(counter_items):
+    if not counter_items:
+        return []
+    maximum = max(count for _label, count in counter_items) or 1
+    total = sum(count for _label, count in counter_items) or 1
+    return [
+        {
+            "label": label,
+            "count": count,
+            "percent": round((count / total) * 100),
+            "width": max(8, round((count / maximum) * 100)),
+        }
+        for label, count in counter_items
+    ]
+
+
+def _build_statistics_panel(database, selected_field_key):
+    records = list(database.records.all())
+    fields_by_key = {field.key: field for field in database.fields.all()}
+
+    if selected_field_key == "__priority__" and database.has_priority:
+        counter = Counter(record.get_priority_display() for record in records)
+        items = _statistics_bar_items(sorted(counter.items(), key=lambda item: item[1], reverse=True))
+        return {
+            "selected": selected_field_key,
+            "title": "Distribucion por prioridad",
+            "description": "Muestra como se reparte la carga de trabajo segun prioridad.",
+            "kind": "distribution",
+            "items": items,
+        }
+
+    if selected_field_key == "__created_at__":
+        counter = Counter(record.created_at.strftime("%d/%m") for record in records)
+        ordered_items = sorted(counter.items(), key=lambda item: item[0])[-7:]
+        items = _statistics_bar_items(ordered_items)
+        return {
+            "selected": selected_field_key,
+            "title": "Registros creados recientemente",
+            "description": "Cuenta cuantos registros se crearon por fecha tomando los ultimos dias con actividad.",
+            "kind": "distribution",
+            "items": items,
+        }
+
+    field = fields_by_key.get(selected_field_key)
+    if not field:
+        return {
+            "selected": selected_field_key,
+            "title": "Selecciona un campo",
+            "description": "Elige un campo para empezar a ver estadisticas utiles de esta base.",
+            "kind": "empty",
+            "items": [],
+        }
+
+    if field.field_type in {CustomField.FieldType.SELECT, CustomField.FieldType.BOOLEAN, CustomField.FieldType.RELATION}:
+        counter = Counter()
+        for record in records:
+            raw_value = record.data.get(field.key, "")
+            if raw_value in ("", None):
+                counter["Sin dato"] += 1
+                continue
+            if field.field_type == CustomField.FieldType.BOOLEAN:
+                counter["Si" if raw_value else "No"] += 1
+            elif field.field_type == CustomField.FieldType.RELATION:
+                counter[_serialize_value_for_history(database, field.key, raw_value)] += 1
+            else:
+                counter[str(raw_value)] += 1
+        items = _statistics_bar_items(sorted(counter.items(), key=lambda item: item[1], reverse=True))
+        return {
+            "selected": selected_field_key,
+            "title": f"Distribucion de {field.label}",
+            "description": "Ideal para estados, opciones, relaciones y campos de si/no.",
+            "kind": "distribution",
+            "items": items,
+        }
+
+    if field.field_type in {CustomField.FieldType.NUMBER, CustomField.FieldType.CURRENCY}:
+        values = []
+        for record in records:
+            raw_value = record.data.get(field.key, "")
+            if raw_value in ("", None):
+                continue
+            try:
+                values.append(Decimal(str(raw_value)))
+            except (InvalidOperation, TypeError):
+                continue
+        if not values:
+            return {
+                "selected": selected_field_key,
+                "title": f"Resumen numerico de {field.label}",
+                "description": "Todavia no hay valores numericos validos para analizar en este campo.",
+                "kind": "numeric",
+                "metrics": [],
+            }
+        total = sum(values)
+        average = total / len(values)
+        formatter = (lambda value: f"{value:.2f}") if field.field_type == CustomField.FieldType.CURRENCY else (lambda value: f"{value.normalize()}")
+        return {
+            "selected": selected_field_key,
+            "title": f"Resumen numerico de {field.label}",
+            "description": "Muestra una lectura rapida de suma, promedio y rango.",
+            "kind": "numeric",
+            "metrics": [
+                {"label": "Valores cargados", "value": str(len(values))},
+                {"label": "Suma total", "value": formatter(total)},
+                {"label": "Promedio", "value": formatter(average)},
+                {"label": "Minimo", "value": formatter(min(values))},
+                {"label": "Maximo", "value": formatter(max(values))},
+            ],
+        }
+
+    if field.field_type == CustomField.FieldType.DATE:
+        counter = Counter()
+        for record in records:
+            raw_value = record.data.get(field.key, "")
+            if raw_value in ("", None):
+                continue
+            counter[str(raw_value)] += 1
+        items = _statistics_bar_items(sorted(counter.items(), key=lambda item: item[0])[-7:])
+        return {
+            "selected": selected_field_key,
+            "title": f"Evolucion de {field.label}",
+            "description": "Cuenta cuantos registros caen en cada fecha disponible para este campo.",
+            "kind": "distribution",
+            "items": items,
+        }
+
+    return {
+        "selected": selected_field_key,
+        "title": "Campo no analizable",
+        "description": "Este tipo de campo todavia no tiene una visualizacion disponible en la primera version.",
+        "kind": "empty",
+        "items": [],
     }
 
 
@@ -845,6 +1006,11 @@ def database_detail(request, slug):
     history_payloads = {str(item.pk): _history_payload_for_activity(item) for item in history_page.object_list}
     recent_activities = database.activities.all()
     today = timezone.localdate()
+    selected_stats_field = request.GET.get("stats_field") or _default_statistics_field(database)
+    statistics_field_options = _statistics_field_options(database)
+    if selected_stats_field not in {value for value, _label in statistics_field_options}:
+        selected_stats_field = _default_statistics_field(database)
+    statistics_panel = _build_statistics_panel(database, selected_stats_field)
     history_stats = {
         "total": recent_activities.count(),
         "today": recent_activities.filter(created_at__date=today).count(),
@@ -892,6 +1058,9 @@ def database_detail(request, slug):
         "history_page": history_page,
         "history_payloads": history_payloads,
         "history_stats": history_stats,
+        "statistics_panel": statistics_panel,
+        "statistics_field_options": statistics_field_options,
+        "selected_stats_field": selected_stats_field,
     }
     return render(request, "database_detail.html", context)
 
@@ -919,25 +1088,7 @@ def saved_view_create(request, slug):
 @login_required
 def database_statistics(request, slug):
     database, membership = _get_database_for_user(request.user, slug)
-    chart_ready_fields = database.fields.filter(
-        field_type__in=[
-            CustomField.FieldType.SELECT,
-            CustomField.FieldType.NUMBER,
-            CustomField.FieldType.CURRENCY,
-            CustomField.FieldType.DATE,
-            CustomField.FieldType.BOOLEAN,
-        ]
-    )
-    return render(
-        request,
-        "database_statistics.html",
-        {
-            "database": database,
-            "membership": membership,
-            "chart_ready_fields": chart_ready_fields,
-            "total_records": database.records.count(),
-        },
-    )
+    return redirect(_database_tab_url(database, "summary"))
 
 
 @login_required
