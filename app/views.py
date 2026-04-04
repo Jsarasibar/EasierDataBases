@@ -2,6 +2,7 @@ import csv
 import json
 import logging
 from collections import Counter
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import urlencode
@@ -17,10 +18,12 @@ from django.http import Http404, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_date
+from django.utils.text import slugify
 from django.views.decorators.clickjacking import xframe_options_exempt
 
-from .forms import CSVImportForm, CSVMappingForm, CustomFieldForm, MembershipForm, RecordForm, RegisterForm, SaveViewForm, WizardOptionsForm, WizardSetupForm, WizardTemplateForm
-from .models import AppDatabase, CustomField, DatabaseActivity, DatabaseMembership, Record, SavedView
+from .forms import CSVImportForm, CSVMappingForm, CustomFieldForm, MembershipForm, RecordForm, RegisterForm, SavedStatisticForm, SaveViewForm, WizardOptionsForm, WizardSetupForm, WizardTemplateForm
+from .models import AppDatabase, CustomField, DatabaseActivity, DatabaseMembership, Record, SavedStatistic, SavedView
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +162,19 @@ def _database_tab_url(database, tab):
     return f"{reverse('database_detail', args=[database.slug])}?tab={tab}"
 
 
+def _build_unique_database_slug(name, *, exclude_pk=None):
+    base_slug = slugify(name) or "base"
+    slug = base_slug
+    counter = 2
+    queryset = AppDatabase.objects.all()
+    if exclude_pk is not None:
+        queryset = queryset.exclude(pk=exclude_pk)
+    while queryset.filter(slug=slug).exists():
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    return slug
+
+
 def _log_database_activity(database, actor, action, detail, payload=None):
     DatabaseActivity.objects.create(
         database=database,
@@ -240,44 +256,330 @@ def _default_statistics_field(database):
 def _statistics_bar_items(counter_items):
     if not counter_items:
         return []
-    maximum = max(count for _label, count in counter_items) or 1
     total = sum(count for _label, count in counter_items) or 1
+    items = []
+    for label, count in counter_items:
+        percent_value = (count / total) * 100
+        percent_rounded = round(percent_value, 1)
+        items.append(
+            {
+                "label": label,
+                "count": count,
+                "percent": percent_rounded,
+                "percent_label": f"{percent_rounded:.1f}".rstrip("0").rstrip("."),
+                "width": percent_rounded,
+                "width_css": f"{percent_rounded:.1f}%",
+            }
+        )
+    return items
+
+
+def _statistics_chart_types_for_kind(kind):
+    if kind == "numeric":
+        return [
+            ("metrics", "Metricas"),
+            ("table", "Tabla"),
+        ]
+    if kind == "distribution":
+        return [
+            ("bars", "Barras"),
+            ("donut", "Torta"),
+            ("table", "Tabla"),
+        ]
+    return [("auto", "Automatico")]
+
+
+def _build_donut_segments(items):
+    if not items:
+        return {"gradient": "", "legend": []}
+    palette = [
+        "#2c67a8",
+        "#c8923f",
+        "#5b9f7f",
+        "#9a5b74",
+        "#6a74b8",
+        "#7b8798",
+    ]
+    parts = []
+    legend = []
+    start = 0
+    for index, item in enumerate(items):
+        color = palette[index % len(palette)]
+        end = start + item["percent"]
+        parts.append(f"{color} {start}% {end}%")
+        legend.append(
+            {
+                "label": item["label"],
+                "count": item["count"],
+                "percent": item["percent"],
+                "color": color,
+            }
+        )
+        start = end
+    return {"gradient": ", ".join(parts), "legend": legend}
+
+
+def _build_pie_segments(items):
+    if not items:
+        return []
+    palette = [
+        "#2c67a8",
+        "#c8923f",
+        "#5b9f7f",
+        "#9a5b74",
+        "#6a74b8",
+        "#7b8798",
+    ]
+    circumference = 251.327
+    segments = []
+    offset = 0
+    for index, item in enumerate(items):
+        color = palette[index % len(palette)]
+        length = round((item["percent"] / 100) * circumference, 3)
+        segments.append(
+            {
+                "color": color,
+                "length": length,
+                "gap": round(circumference - length, 3),
+                "offset": round(-offset, 3),
+                "label": item["label"],
+                "count": item["count"],
+                "percent": item["percent"],
+            }
+        )
+        offset += length
+    return segments
+
+
+def _statistics_summary_rows(items):
     return [
         {
-            "label": label,
-            "count": count,
-            "percent": round((count / total) * 100),
-            "width": max(8, round((count / maximum) * 100)),
+            "label": item["label"],
+            "value": str(item["count"]),
+            "secondary": f"{item.get('percent_label', item['percent'])}%",
         }
-        for label, count in counter_items
+        for item in items
     ]
 
 
-def _build_statistics_panel(database, selected_field_key):
+def _build_statistics_interpretation(database, statistics_panel, filtered_records, total_records):
+    interpretation = {
+        "title": "Interpretacion del analisis",
+        "items": [],
+    }
+    filtered_count = len(filtered_records)
+    if statistics_panel.get("kind") == "distribution":
+        items = statistics_panel.get("items", [])
+        if not items:
+            interpretation["items"] = [
+                "Todavia no hay datos suficientes para construir una lectura clara.",
+                "Prueba con otro campo o suma mas registros a esta base.",
+            ]
+            return interpretation
+        top_item = items[0]
+        interpretation["items"].append(
+            f"La categoria mas representada es {top_item['label']} con {top_item['percent']}% del total analizado."
+        )
+        if filtered_count != total_records:
+            interpretation["items"].append(
+                f"Este resultado se calculo sobre {filtered_count} registros filtrados de {total_records} disponibles en la base."
+            )
+        missing_item = next((item for item in items if item["label"] == "Sin dato"), None)
+        if missing_item and missing_item["count"]:
+            interpretation["items"].append(
+                f"Hay {missing_item['count']} registros sin dato en este campo; conviene completarlos para mejorar la lectura."
+            )
+        elif len(items) > 1:
+            interpretation["items"].append(
+                f"La segunda presencia mas fuerte es {items[1]['label']} con {items[1]['percent']}%, lo que ayuda a comparar la distribucion."
+            )
+        return interpretation
+
+    if statistics_panel.get("kind") == "numeric":
+        metrics = {metric["label"]: metric["value"] for metric in statistics_panel.get("metrics", [])}
+        if not metrics:
+            interpretation["items"] = [
+                "Este campo todavia no tiene numeros validos suficientes para construir metricas.",
+                "Cuando cargues valores, aqui veras suma, promedio y rango util para tomar decisiones.",
+            ]
+            return interpretation
+        interpretation["items"] = [
+            f"Se analizaron {metrics.get('Valores cargados', '0')} valores numericos validos en este campo.",
+            f"El promedio actual es {metrics.get('Promedio', '-')}, con un rango entre {metrics.get('Minimo', '-')} y {metrics.get('Maximo', '-')}.",
+            f"La suma acumulada llega a {metrics.get('Suma total', '-')}, util para ver volumen total o valor concentrado.",
+        ]
+        return interpretation
+
+    interpretation["items"] = [
+        "Selecciona un campo analizable para obtener una lectura automatica mas rica.",
+        "Los campos de seleccion, relacion, fecha, prioridad y numero suelen ser los mas utiles para empezar.",
+    ]
+    return interpretation
+
+
+def _build_statistics_auto_summary(database, filtered_records, statistics_panel, history_stats):
+    total_records = database.records.count()
+    relation_fields = database.fields.filter(field_type=CustomField.FieldType.RELATION)
+    filled_relation_count = 0
+    for record in filtered_records:
+        if any(record.data.get(field.key) not in ("", None) for field in relation_fields):
+            filled_relation_count += 1
+
+    cards = [
+        {"label": "Registros totales", "value": str(total_records)},
+        {"label": "Campos definidos", "value": str(database.fields.count())},
+        {"label": "Relaciones activas", "value": str(relation_fields.count())},
+        {"label": "Movimientos de hoy", "value": str(history_stats["today"])},
+    ]
+
+    insights = []
+    if statistics_panel.get("kind") == "distribution" and statistics_panel.get("items"):
+        top_item = statistics_panel["items"][0]
+        insights.append(
+            f"Hoy el dato mas fuerte en este analisis es {top_item['label']}, que concentra {top_item['percent']}%."
+        )
+    elif statistics_panel.get("kind") == "numeric" and statistics_panel.get("metrics"):
+        metrics = {metric["label"]: metric["value"] for metric in statistics_panel["metrics"]}
+        insights.append(
+            f"El promedio actual del campo analizado es {metrics.get('Promedio', '-')}, sobre {metrics.get('Valores cargados', '0')} valores validos."
+        )
+    else:
+        insights.append("La base ya esta lista para analizar distribuciones, fechas o campos numericos cuando tengas mas datos.")
+
+    if database.has_priority:
+        urgent = database.records.filter(priority=Record.Priority.URGENT).count()
+        high = database.records.filter(priority=Record.Priority.HIGH).count()
+        insights.append(f"En prioridades, hay {urgent} urgentes y {high} altas para seguir de cerca.")
+    else:
+        insights.append(f"{filled_relation_count} registros ya usan al menos una relacion cargada dentro de la base.")
+
+    return {"cards": cards, "insights": insights}
+
+
+def _build_operational_statistics(database):
     records = list(database.records.all())
+    relation_fields = list(database.fields.filter(field_type=CustomField.FieldType.RELATION))
+    date_fields = list(database.fields.filter(field_type=CustomField.FieldType.DATE))
+    select_fields = list(database.fields.filter(field_type=CustomField.FieldType.SELECT))
+    created_recently = database.records.filter(created_at__date__gte=(timezone.localdate() - timedelta(days=7))).count()
+
+    relation_missing = 0
+    if relation_fields:
+        for record in records:
+            if any(record.data.get(field.key) in ("", None) for field in relation_fields):
+                relation_missing += 1
+
+    select_missing = 0
+    if select_fields:
+        for record in records:
+            if any(record.data.get(field.key) in ("", None, "") for field in select_fields):
+                select_missing += 1
+
+    next_due_label = "-"
+    if date_fields:
+        dates = []
+        for field in date_fields:
+            for record in records:
+                raw_value = record.data.get(field.key)
+                parsed = parse_date(str(raw_value)) if raw_value else None
+                if parsed:
+                    dates.append(parsed)
+        if dates:
+            next_due_label = min(dates).strftime("%d/%m/%Y")
+
+    items = [
+        {
+            "label": "Registros creados en 7 dias",
+            "value": str(created_recently),
+            "detail": "Sirve para ver ritmo reciente de carga o movimiento.",
+        },
+        {
+            "label": "Registros con relaciones vacias",
+            "value": str(relation_missing),
+            "detail": "Ayuda a detectar elementos que todavia no quedaron vinculados.",
+        },
+        {
+            "label": "Registros con seleccion vacia",
+            "value": str(select_missing),
+            "detail": "Marca donde faltan estados, categorias u opciones clave.",
+        },
+        {
+            "label": "Proxima fecha cargada",
+            "value": next_due_label,
+            "detail": "Toma la fecha mas cercana disponible entre los campos tipo fecha.",
+        },
+    ]
+    if database.has_priority:
+        items.insert(
+            0,
+            {
+                "label": "Prioridad urgente",
+                "value": str(database.records.filter(priority=Record.Priority.URGENT).count()),
+                "detail": "Elementos que requieren atencion inmediata.",
+            },
+        )
+    return items
+
+
+def _resolve_statistics_chart_type(requested_chart_type, kind):
+    allowed_types = {value for value, _label in _statistics_chart_types_for_kind(kind)}
+    if requested_chart_type in allowed_types:
+        return requested_chart_type
+    return next(iter(allowed_types), "auto")
+
+
+def _filter_statistics_queryset(queryset, *, query="", priority="", date_from=None, date_to=None, has_priority=False):
+    if query:
+        queryset = queryset.filter(
+            Q(title__icontains=query)
+            | Q(data_text__icontains=query)
+        )
+    if has_priority and priority:
+        queryset = queryset.filter(priority=priority)
+    if date_from:
+        queryset = queryset.filter(created_at__date__gte=date_from)
+    if date_to:
+        queryset = queryset.filter(created_at__date__lte=date_to)
+    return queryset
+
+
+def _build_statistics_panel(database, selected_field_key, *, records=None, chart_type="auto"):
+    records = list(records if records is not None else database.records.all())
     fields_by_key = {field.key: field for field in database.fields.all()}
 
     if selected_field_key == "__priority__" and database.has_priority:
         counter = Counter(record.get_priority_display() for record in records)
         items = _statistics_bar_items(sorted(counter.items(), key=lambda item: item[1], reverse=True))
+        resolved_chart_type = _resolve_statistics_chart_type(chart_type, "distribution")
         return {
             "selected": selected_field_key,
             "title": "Distribucion por prioridad",
             "description": "Muestra como se reparte la carga de trabajo segun prioridad.",
             "kind": "distribution",
             "items": items,
+            "rows": _statistics_summary_rows(items),
+            "chart_type": resolved_chart_type,
+            "chart_type_options": _statistics_chart_types_for_kind("distribution"),
+            "donut": _build_donut_segments(items),
+            "pie_segments": _build_pie_segments(items),
         }
 
     if selected_field_key == "__created_at__":
         counter = Counter(record.created_at.strftime("%d/%m") for record in records)
         ordered_items = sorted(counter.items(), key=lambda item: item[0])[-7:]
         items = _statistics_bar_items(ordered_items)
+        resolved_chart_type = _resolve_statistics_chart_type(chart_type, "distribution")
         return {
             "selected": selected_field_key,
             "title": "Registros creados recientemente",
             "description": "Cuenta cuantos registros se crearon por fecha tomando los ultimos dias con actividad.",
             "kind": "distribution",
             "items": items,
+            "rows": _statistics_summary_rows(items),
+            "chart_type": resolved_chart_type,
+            "chart_type_options": _statistics_chart_types_for_kind("distribution"),
+            "donut": _build_donut_segments(items),
+            "pie_segments": _build_pie_segments(items),
         }
 
     field = fields_by_key.get(selected_field_key)
@@ -288,6 +590,8 @@ def _build_statistics_panel(database, selected_field_key):
             "description": "Elige un campo para empezar a ver estadisticas utiles de esta base.",
             "kind": "empty",
             "items": [],
+            "chart_type": "auto",
+            "chart_type_options": _statistics_chart_types_for_kind("empty"),
         }
 
     if field.field_type in {CustomField.FieldType.SELECT, CustomField.FieldType.BOOLEAN, CustomField.FieldType.RELATION}:
@@ -304,12 +608,18 @@ def _build_statistics_panel(database, selected_field_key):
             else:
                 counter[str(raw_value)] += 1
         items = _statistics_bar_items(sorted(counter.items(), key=lambda item: item[1], reverse=True))
+        resolved_chart_type = _resolve_statistics_chart_type(chart_type, "distribution")
         return {
             "selected": selected_field_key,
             "title": f"Distribucion de {field.label}",
             "description": "Ideal para estados, opciones, relaciones y campos de si/no.",
             "kind": "distribution",
             "items": items,
+            "rows": _statistics_summary_rows(items),
+            "chart_type": resolved_chart_type,
+            "chart_type_options": _statistics_chart_types_for_kind("distribution"),
+            "donut": _build_donut_segments(items),
+            "pie_segments": _build_pie_segments(items),
         }
 
     if field.field_type in {CustomField.FieldType.NUMBER, CustomField.FieldType.CURRENCY}:
@@ -322,6 +632,7 @@ def _build_statistics_panel(database, selected_field_key):
                 values.append(Decimal(str(raw_value)))
             except (InvalidOperation, TypeError):
                 continue
+        resolved_chart_type = _resolve_statistics_chart_type(chart_type, "numeric")
         if not values:
             return {
                 "selected": selected_field_key,
@@ -329,22 +640,29 @@ def _build_statistics_panel(database, selected_field_key):
                 "description": "Todavia no hay valores numericos validos para analizar en este campo.",
                 "kind": "numeric",
                 "metrics": [],
+                "rows": [],
+                "chart_type": resolved_chart_type,
+                "chart_type_options": _statistics_chart_types_for_kind("numeric"),
             }
         total = sum(values)
         average = total / len(values)
         formatter = (lambda value: f"{value:.2f}") if field.field_type == CustomField.FieldType.CURRENCY else (lambda value: f"{value.normalize()}")
+        metrics = [
+            {"label": "Valores cargados", "value": str(len(values))},
+            {"label": "Suma total", "value": formatter(total)},
+            {"label": "Promedio", "value": formatter(average)},
+            {"label": "Minimo", "value": formatter(min(values))},
+            {"label": "Maximo", "value": formatter(max(values))},
+        ]
         return {
             "selected": selected_field_key,
             "title": f"Resumen numerico de {field.label}",
             "description": "Muestra una lectura rapida de suma, promedio y rango.",
             "kind": "numeric",
-            "metrics": [
-                {"label": "Valores cargados", "value": str(len(values))},
-                {"label": "Suma total", "value": formatter(total)},
-                {"label": "Promedio", "value": formatter(average)},
-                {"label": "Minimo", "value": formatter(min(values))},
-                {"label": "Maximo", "value": formatter(max(values))},
-            ],
+            "metrics": metrics,
+            "rows": [{"label": item["label"], "value": item["value"], "secondary": ""} for item in metrics],
+            "chart_type": resolved_chart_type,
+            "chart_type_options": _statistics_chart_types_for_kind("numeric"),
         }
 
     if field.field_type == CustomField.FieldType.DATE:
@@ -355,12 +673,18 @@ def _build_statistics_panel(database, selected_field_key):
                 continue
             counter[str(raw_value)] += 1
         items = _statistics_bar_items(sorted(counter.items(), key=lambda item: item[0])[-7:])
+        resolved_chart_type = _resolve_statistics_chart_type(chart_type, "distribution")
         return {
             "selected": selected_field_key,
             "title": f"Evolucion de {field.label}",
             "description": "Cuenta cuantos registros caen en cada fecha disponible para este campo.",
             "kind": "distribution",
             "items": items,
+            "rows": _statistics_summary_rows(items),
+            "chart_type": resolved_chart_type,
+            "chart_type_options": _statistics_chart_types_for_kind("distribution"),
+            "donut": _build_donut_segments(items),
+            "pie_segments": _build_pie_segments(items),
         }
 
     return {
@@ -369,6 +693,8 @@ def _build_statistics_panel(database, selected_field_key):
         "description": "Este tipo de campo todavia no tiene una visualizacion disponible en la primera version.",
         "kind": "empty",
         "items": [],
+        "chart_type": "auto",
+        "chart_type_options": _statistics_chart_types_for_kind("empty"),
     }
 
 
@@ -1006,16 +1332,108 @@ def database_detail(request, slug):
     history_payloads = {str(item.pk): _history_payload_for_activity(item) for item in history_page.object_list}
     recent_activities = database.activities.all()
     today = timezone.localdate()
-    selected_stats_field = request.GET.get("stats_field") or _default_statistics_field(database)
+    saved_statistic_id = request.GET.get("saved_stat")
+    saved_statistic = database.saved_statistics.filter(user=request.user, pk=saved_statistic_id).first() if saved_statistic_id else None
+    if saved_statistic:
+        selected_stats_field = saved_statistic.field_key
+        stats_chart_type = saved_statistic.chart_type
+        stats_query = saved_statistic.query
+        stats_priority = saved_statistic.priority if database.has_priority else ""
+        stats_date_from = saved_statistic.date_from.isoformat() if saved_statistic.date_from else ""
+        stats_date_to = saved_statistic.date_to.isoformat() if saved_statistic.date_to else ""
+    else:
+        selected_stats_field = request.GET.get("stats_field", "").strip()
+        stats_chart_type = request.GET.get("chart_type", SavedStatistic.ChartType.AUTO)
+        stats_query = request.GET.get("stats_query", "").strip()
+        stats_priority = request.GET.get("stats_priority", "").strip()
+        stats_date_from = request.GET.get("stats_date_from", "").strip()
+        stats_date_to = request.GET.get("stats_date_to", "").strip()
     statistics_field_options = _statistics_field_options(database)
-    if selected_stats_field not in {value for value, _label in statistics_field_options}:
+    valid_statistics_fields = {value for value, _label in statistics_field_options}
+    if selected_stats_field and selected_stats_field not in valid_statistics_fields:
         selected_stats_field = _default_statistics_field(database)
-    statistics_panel = _build_statistics_panel(database, selected_stats_field)
+    effective_stats_field = selected_stats_field or _default_statistics_field(database)
+    parsed_stats_date_from = parse_date(stats_date_from) if stats_date_from else None
+    parsed_stats_date_to = parse_date(stats_date_to) if stats_date_to else None
+    stats_queryset = _filter_statistics_queryset(
+        database.records.all().annotate(data_text=Cast("data", output_field=TextField())),
+        query=stats_query,
+        priority=stats_priority,
+        date_from=parsed_stats_date_from,
+        date_to=parsed_stats_date_to,
+        has_priority=database.has_priority,
+    )
+    filtered_stats_records = list(stats_queryset)
+    statistics_panel = _build_statistics_panel(
+        database,
+        effective_stats_field,
+        records=filtered_stats_records,
+        chart_type=stats_chart_type,
+    )
+    statistics_interpretation = _build_statistics_interpretation(
+        database,
+        statistics_panel,
+        filtered_stats_records,
+        total_records,
+    )
     history_stats = {
         "total": recent_activities.count(),
         "today": recent_activities.filter(created_at__date=today).count(),
         "actors": recent_activities.exclude(actor=None).values("actor").distinct().count(),
     }
+    statistics_auto_summary = _build_statistics_auto_summary(
+        database,
+        filtered_stats_records,
+        statistics_panel,
+        history_stats,
+    )
+    operational_statistics = _build_operational_statistics(database)
+    saved_statistics = database.saved_statistics.filter(user=request.user)
+    section_help = {
+        "summary": {
+            "title": "Estadisticas",
+            "items": [
+                "Aqui puedes analizar campos de la base con vistas de barras, torta, tabla o metricas.",
+                "Los filtros previos recortan los registros antes del calculo para que el resultado sea mas util.",
+                "Tambien puedes guardar configuraciones frecuentes para volver a abrirlas rapido.",
+            ],
+        },
+        "daily": {
+            "title": "Trabajo diario",
+            "items": [
+                "Esta seccion muestra lo urgente o mas reciente para operar rapido.",
+                "Desde aqui puedes abrir registros y continuar tareas del dia.",
+            ],
+        },
+        "records": {
+            "title": "Registros",
+            "items": [
+                "Aqui ves toda la base en tabla o tarjetas.",
+                "Puedes buscar, filtrar, ordenar y agregar nuevos registros.",
+            ],
+        },
+        "structure": {
+            "title": "Estructura",
+            "items": [
+                "Aqui defines columnas, tipos de dato y relaciones entre bases.",
+                "Si eres admin tambien puedes cambiar la columna principal del registro.",
+            ],
+        },
+        "manage": {
+            "title": "Gestion",
+            "items": [
+                "Aqui importas o exportas datos y administras permisos de la base.",
+                "Tambien estan las acciones sensibles como eliminar la base si corresponde.",
+            ],
+        },
+        "history": {
+            "title": "Historial",
+            "items": [
+                "Aqui se registran los movimientos realizados en la base.",
+                "Puedes ver que cambio, quien lo hizo y cuando ocurrio.",
+            ],
+        },
+    }.get(active_tab, {"title": "Ayuda", "items": []})
 
     context = {
         "database": database,
@@ -1059,8 +1477,23 @@ def database_detail(request, slug):
         "history_payloads": history_payloads,
         "history_stats": history_stats,
         "statistics_panel": statistics_panel,
+        "statistics_interpretation": statistics_interpretation,
+        "statistics_auto_summary": statistics_auto_summary,
+        "operational_statistics": operational_statistics,
         "statistics_field_options": statistics_field_options,
         "selected_stats_field": selected_stats_field,
+        "stats_chart_type": statistics_panel.get("chart_type", SavedStatistic.ChartType.AUTO),
+        "stats_query": stats_query,
+        "stats_priority": stats_priority,
+        "stats_date_from": stats_date_from,
+        "stats_date_to": stats_date_to,
+        "stats_has_advanced_filters": any([stats_query, stats_priority, stats_date_from, stats_date_to]),
+        "stats_filtered_count": len(filtered_stats_records),
+        "stats_chart_type_options": statistics_panel.get("chart_type_options", []),
+        "saved_statistics": saved_statistics,
+        "selected_saved_statistic": saved_statistic,
+        "saved_statistic_form": SavedStatisticForm(),
+        "section_help": section_help,
     }
     return render(request, "database_detail.html", context)
 
@@ -1088,6 +1521,44 @@ def saved_view_create(request, slug):
 @login_required
 def database_statistics(request, slug):
     database, membership = _get_database_for_user(request.user, slug)
+    return redirect(_database_tab_url(database, "summary"))
+
+
+@login_required
+def saved_statistic_create(request, slug):
+    database, membership = _get_database_for_user(request.user, slug)
+    if request.method == "POST":
+        form = SavedStatisticForm(request.POST)
+        if form.is_valid():
+            defaults = {
+                "field_key": request.POST.get("stats_field") or _default_statistics_field(database),
+                "chart_type": request.POST.get("chart_type", SavedStatistic.ChartType.AUTO),
+                "query": request.POST.get("stats_query", "").strip(),
+                "priority": request.POST.get("stats_priority", "").strip() if database.has_priority else "",
+                "date_from": parse_date(request.POST.get("stats_date_from", "").strip() or "") or None,
+                "date_to": parse_date(request.POST.get("stats_date_to", "").strip() or "") or None,
+            }
+            saved_statistic, created = SavedStatistic.objects.update_or_create(
+                database=database,
+                user=request.user,
+                name=form.cleaned_data["name"],
+                defaults=defaults,
+            )
+            action = "guardada" if created else "actualizada"
+            messages.success(request, f"La estadistica {saved_statistic.name} fue {action}.")
+            return redirect(f"{_database_tab_url(database, 'summary')}&saved_stat={saved_statistic.pk}")
+        messages.error(request, "Escribe un nombre para guardar esta estadistica.")
+    return redirect(_database_tab_url(database, "summary"))
+
+
+@login_required
+def saved_statistic_delete(request, slug, statistic_id):
+    database, membership = _get_database_for_user(request.user, slug)
+    statistic = get_object_or_404(database.saved_statistics.filter(user=request.user), pk=statistic_id)
+    if request.method == "POST":
+        statistic_name = statistic.name
+        statistic.delete()
+        messages.success(request, f"La estadistica {statistic_name} fue eliminada.")
     return redirect(_database_tab_url(database, "summary"))
 
 
@@ -1121,6 +1592,44 @@ def database_delete(request, slug):
             "expected_phrase": expected_phrase,
         },
     )
+
+
+@login_required
+def database_rename(request, slug):
+    database, membership = _get_database_for_user(request.user, slug)
+    if membership.role != DatabaseMembership.Role.ADMIN:
+        return HttpResponseForbidden("Solo los administradores pueden renombrar una base.")
+
+    if request.method == "POST":
+        new_name = request.POST.get("new_name", "").strip()
+        if not new_name:
+            messages.error(request, "Escribe un nombre valido para la base.")
+            return redirect(_database_tab_url(database, "manage"))
+        if new_name == database.name:
+            messages.info(request, "La base ya tiene ese nombre.")
+            return redirect(_database_tab_url(database, "manage"))
+
+        previous_name = database.name
+        previous_slug = database.slug
+        database.name = new_name
+        database.slug = _build_unique_database_slug(new_name, exclude_pk=database.pk)
+        database.save(update_fields=["name", "slug", "updated_at"])
+        _log_database_activity(
+            database,
+            request.user,
+            "Base renombrada",
+            f"La base paso de {previous_name} a {database.name}.",
+            payload={
+                "changes": [
+                    {"label": "Nombre", "before": previous_name, "after": database.name},
+                    {"label": "Slug", "before": previous_slug, "after": database.slug},
+                ]
+            },
+        )
+        messages.success(request, f"La base ahora se llama {database.name}.")
+        return redirect(_database_tab_url(database, "manage"))
+
+    return redirect(_database_tab_url(database, "manage"))
 
 
 @login_required

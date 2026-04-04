@@ -222,6 +222,41 @@ class SavedView(models.Model):
         return f"{self.database.name}: {self.name}"
 
 
+class SavedStatistic(models.Model):
+    class ChartType(models.TextChoices):
+        AUTO = "auto", "Automatico"
+        BARS = "bars", "Barras"
+        DONUT = "donut", "Dona"
+        TABLE = "table", "Tabla"
+        METRICS = "metrics", "Metricas"
+
+    database = models.ForeignKey(
+        AppDatabase,
+        on_delete=models.CASCADE,
+        related_name="saved_statistics",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="saved_statistics",
+    )
+    name = models.CharField(max_length=80)
+    field_key = models.CharField(max_length=80, default="__created_at__")
+    chart_type = models.CharField(max_length=16, choices=ChartType.choices, default=ChartType.AUTO)
+    query = models.CharField(max_length=120, blank=True)
+    priority = models.CharField(max_length=12, blank=True)
+    date_from = models.DateField(null=True, blank=True)
+    date_to = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("database", "user", "name")
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.database.name}: {self.name}"
+
+
 class DatabaseActivity(models.Model):
     database = models.ForeignKey(
         AppDatabase,

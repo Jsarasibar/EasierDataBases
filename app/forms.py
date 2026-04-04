@@ -15,7 +15,7 @@ from django.utils.text import slugify
 
 from django.conf import settings
 
-from .models import AppDatabase, CustomField, DatabaseMembership, Record, SavedView
+from .models import AppDatabase, CustomField, DatabaseMembership, Record, SavedStatistic, SavedView
 
 
 User = get_user_model()
@@ -128,6 +128,13 @@ class SaveViewForm(forms.ModelForm):
         model = SavedView
         fields = ("name",)
         labels = {"name": "Nombre de la vista"}
+
+
+class SavedStatisticForm(forms.ModelForm):
+    class Meta:
+        model = SavedStatistic
+        fields = ("name",)
+        labels = {"name": "Nombre de la estadistica"}
 
 
 class CSVMappingForm(forms.Form):

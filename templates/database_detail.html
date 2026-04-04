@@ -11,155 +11,317 @@
         <p>{{ database.description|default:"Lista creada para trabajar sin pelearte con la complejidad tecnica." }}</p>
     </div>
     <div class="hero-actions">
-        <a class="button" href="{% url 'record_create' database.slug %}">Nuevo registro</a>
         <a class="button subtle" href="{% url 'dashboard' %}">Volver</a>
     </div>
 </section>
 
-<section class="tab-strip">
-    <a class="tab-link {% if active_tab == 'records' %}is-current{% endif %}" href="?tab=records">Registros</a>
-    <a class="tab-link {% if active_tab == 'daily' %}is-current{% endif %}" href="?tab=daily">Trabajo diario</a>
-    <a class="tab-link {% if active_tab == 'summary' %}is-current{% endif %}" href="?tab=summary">Estadisticas</a>
-    <a class="tab-link {% if active_tab == 'structure' %}is-current{% endif %}" href="?tab=structure">Estructura</a>
-    <a class="tab-link {% if active_tab == 'manage' %}is-current{% endif %}" href="?tab=manage">Gestion</a>
-    <a class="tab-link {% if active_tab == 'history' %}is-current{% endif %}" href="?tab=history">Historial</a>
+<section class="tab-strip tab-strip-with-help">
+    <div class="tab-strip-links">
+        <a class="tab-link {% if active_tab == 'records' %}is-current{% endif %}" href="?tab=records">Registros</a>
+        <a class="tab-link {% if active_tab == 'daily' %}is-current{% endif %}" href="?tab=daily">Trabajo diario</a>
+        <a class="tab-link {% if active_tab == 'summary' %}is-current{% endif %}" href="?tab=summary">Estadisticas</a>
+        <a class="tab-link {% if active_tab == 'structure' %}is-current{% endif %}" href="?tab=structure">Estructura</a>
+        <a class="tab-link {% if active_tab == 'manage' %}is-current{% endif %}" href="?tab=manage">Gestion</a>
+        <a class="tab-link {% if active_tab == 'history' %}is-current{% endif %}" href="?tab=history">Historial</a>
+    </div>
+    <button type="button" class="pill help-trigger" data-section-help-open aria-label="Ayuda de esta seccion">Ayuda<span class="visually-hidden"> Que puedes leer aqui</span></button>
 </section>
 
 {% if active_tab == 'summary' %}
-    <section class="stats-grid">
-        <article class="stat-card"><strong>{{ stats.records }}</strong><span>Registros totales</span></article>
-        <article class="stat-card"><strong>{{ stats.fields }}</strong><span>Campos definidos</span></article>
-        <article class="stat-card"><strong>{{ stats.relations }}</strong><span>Relaciones</span></article>
-        <article class="stat-card"><strong>{{ history_stats.today }}</strong><span>Movimientos de hoy</span></article>
+    <section class="panel stats-summary-panel">
+        <div class="panel-head">
+            <div>
+                <h2>Resumen automatico</h2>
+                <p>Una lectura rapida de la base y del analisis actual para entender que esta pasando sin configurar nada extra.</p>
+            </div>
+        </div>
+        <section class="stats-grid stats-grid-4">
+            {% for item in statistics_auto_summary.cards %}
+                <article class="stat-card">
+                    <strong>{{ item.value }}</strong>
+                    <span>{{ item.label }}</span>
+                </article>
+            {% endfor %}
+        </section>
+        <div class="stats-summary-insights">
+            {% for item in statistics_auto_summary.insights %}
+                <article class="database-card">
+                    <p>{{ item }}</p>
+                </article>
+            {% endfor %}
+        </div>
     </section>
 
-    <section class="detail-grid">
-        <article class="panel">
-            <div class="panel-head">
-                <h2>Lectura general</h2>
-                <p>Una primera lectura automatica de la base para entender volumen, estructura y actividad reciente.</p>
+    <section class="panel top-gap">
+        <div class="panel-head">
+            <div>
+                <h2>Estadisticas utiles para operar</h2>
+                <p>Indicadores rapidos para detectar pendientes, faltantes y movimientos que merecen atencion.</p>
             </div>
-            <div class="record-meta">
-                <div class="record-meta-row"><span>Campos tipo seleccion</span><strong>{{ stats.selects }}</strong></div>
-                <div class="record-meta-row"><span>Usuarios con actividad</span><strong>{{ history_stats.actors }}</strong></div>
-                {% if has_priority %}
-                    <div class="record-meta-row"><span>Prioridad alta</span><strong>{{ stats.high }}</strong></div>
-                    <div class="record-meta-row"><span>Prioridad urgente</span><strong>{{ stats.urgent }}</strong></div>
-                {% else %}
-                    <div class="record-meta-row"><span>Campo principal</span><strong>{{ primary_field.label|default:"Sin definir" }}</strong></div>
-                {% endif %}
-                <div class="record-meta-row"><span>Miembros</span><strong>{{ database.memberships.count }}</strong></div>
-            </div>
-        </article>
+        </div>
+        <section class="stats-grid operational-stats-grid">
+            {% for item in operational_statistics %}
+                <article class="stat-card">
+                    <strong>{{ item.value }}</strong>
+                    <span>{{ item.label }}</span>
+                    <small>{{ item.detail }}</small>
+                </article>
+            {% endfor %}
+        </section>
+    </section>
 
-        <article class="panel">
+    <section class="stats-workspace-grid top-gap">
+        <article class="panel stats-builder-panel">
             <div class="panel-head">
-                <h2>Analizador de campo</h2>
-                <p>Selecciona que dato quieres analizar. La primera version adapta la lectura segun el tipo de campo.</p>
+                <h2>Constructor de estadisticas</h2>
+                <p>Analizador de campo para elegir que quieres analizar. Los filtros marcados como opcional solo afinan el resultado cuando los necesitas.</p>
             </div>
-            <form method="get" class="toolbar toolbar-vertical">
+            <form method="get" class="toolbar toolbar-vertical stats-builder-form">
                 <input type="hidden" name="tab" value="summary">
-                <select name="stats_field">
-                    {% for value, label in statistics_field_options %}
-                        <option value="{{ value }}" {% if selected_stats_field == value %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="button subtle">Actualizar analisis</button>
+                <div class="stats-builder-grid">
+                    <label class="field">
+                        <span>Dato a analizar</span>
+                        <select name="stats_field">
+                            <option value="" {% if not selected_stats_field %}selected{% endif %}>Seleccionar campo</option>
+                            {% for value, label in statistics_field_options %}
+                                <option value="{{ value }}" {% if selected_stats_field == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Tipo de grafico</span>
+                        <select name="chart_type">
+                            {% for value, label in stats_chart_type_options %}
+                                <option value="{{ value }}" {% if stats_chart_type == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+                <details class="stats-advanced-details" {% if stats_has_advanced_filters %}open{% endif %}>
+                    <summary>Opciones avanzadas</summary>
+                    <div class="stats-builder-grid stats-builder-grid-advanced">
+                        <label class="field">
+                            <span>Buscar dentro de los registros (opcional)</span>
+                            <input type="text" name="stats_query" value="{{ stats_query }}" placeholder="Ej: proveedor, categoria, cliente">
+                        </label>
+                        {% if has_priority %}
+                            <label class="field">
+                                <span>Prioridad (opcional)</span>
+                                <select name="stats_priority">
+                                    <option value="">Todas</option>
+                                    {% for value, label in priority_choices %}
+                                        <option value="{{ value }}" {% if stats_priority == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </label>
+                        {% endif %}
+                        <label class="field">
+                            <span>Desde (opcional)</span>
+                            <input type="date" name="stats_date_from" value="{{ stats_date_from }}">
+                        </label>
+                        <label class="field">
+                            <span>Hasta (opcional)</span>
+                            <input type="date" name="stats_date_to" value="{{ stats_date_to }}">
+                        </label>
+                    </div>
+                </details>
+                <div class="hero-actions">
+                    <button type="submit" class="button">Actualizar analisis</button>
+                    <a class="button subtle" href="?tab=summary">Limpiar filtros</a>
+                </div>
             </form>
         </article>
-    </section>
 
-    <section class="panel">
+        <article class="panel stats-result-panel">
+            <div class="panel-head split">
+                <div>
+                    <h2>{{ statistics_panel.title }}</h2>
+                    <p>{{ statistics_panel.description }}</p>
+                </div>
+                <span class="pill is-active">{{ stats_filtered_count }} registros analizados</span>
+            </div>
+            {% if statistics_panel.kind == 'distribution' %}
+                {% if statistics_panel.chart_type == 'donut' %}
+                    {% if statistics_panel.donut.legend %}
+                        <div class="stats-donut-layout">
+                            <div class="stats-pie-visual" role="img" aria-label="Grafico de torta" style="background: conic-gradient({{ statistics_panel.donut.gradient }});"></div>
+                            <div class="stats-donut-legend">
+                                {% for item in statistics_panel.donut.legend %}
+                                    <article class="stats-legend-item">
+                                        <span class="stats-legend-dot" style="background: {{ item.color }};"></span>
+                                        <div>
+                                            <strong>{{ item.label }}</strong>
+                                            <p>{{ item.count }} registros · {{ item.percent_label }}%</p>
+                                        </div>
+                                    </article>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <h3>No hay datos suficientes para este analisis</h3>
+                            <p>Prueba con otro campo o carga mas registros para ver distribuciones utiles.</p>
+                        </div>
+                    {% endif %}
+                {% elif statistics_panel.chart_type == 'table' %}
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Valor</th>
+                                    <th>Cantidad</th>
+                                    <th>Peso relativo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in statistics_panel.rows %}
+                                    <tr>
+                                        <td>{{ row.label }}</td>
+                                        <td>{{ row.value }}</td>
+                                        <td>{{ row.secondary }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="3">No hay datos suficientes para este analisis.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="stats-bars">
+                        {% for item in statistics_panel.items %}
+                            <article class="stats-bar-card">
+                                <div class="member-row">
+                                    <strong>{{ item.label }}</strong>
+                                    <span class="pill">{{ item.count }} · {{ item.percent_label }}%</span>
+                                </div>
+                                <div class="stats-bar-track">
+                                    <div class="stats-bar-fill" style="width: {{ item.width_css }};"></div>
+                                </div>
+                            </article>
+                        {% empty %}
+                            <div class="empty-state">
+                                <h3>No hay datos suficientes para este analisis</h3>
+                                <p>Prueba con otro campo o carga mas registros para ver distribuciones utiles.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% elif statistics_panel.kind == 'numeric' %}
+                {% if statistics_panel.chart_type == 'table' %}
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Metrica</th>
+                                    <th>Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in statistics_panel.rows %}
+                                    <tr>
+                                        <td>{{ row.label }}</td>
+                                        <td>{{ row.value }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="2">No hay valores numericos todavia.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="stats-grid stats-metrics-grid">
+                        {% for metric in statistics_panel.metrics %}
+                            <article class="stat-card">
+                                <strong>{{ metric.value }}</strong>
+                                <span>{{ metric.label }}</span>
+                            </article>
+                        {% empty %}
+                            <div class="empty-state">
+                                <h3>No hay valores numericos todavia</h3>
+                                <p>Cuando este campo tenga datos validos, aqui veras suma, promedio y rango.</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% else %}
+                <div class="empty-state">
+                    <h3>Selecciona un campo para empezar</h3>
+                    <p>El analizador mostrara conteos, distribuciones o metricas segun el tipo de dato.</p>
+                </div>
+            {% endif %}
+        </article>
+
+        <article class="panel stats-insight-panel">
+            <div class="panel-head">
+                <h2>Interpretacion del analisis</h2>
+                <p>Lectura automatica para entender que significa el resultado actual y como usarlo.</p>
+            </div>
+            <div class="stack-form compact">
+                {% for item in statistics_interpretation.items %}
+                    <article class="database-card">
+                        <p>{{ item }}</p>
+                    </article>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+    <section class="panel top-gap">
         <div class="panel-head">
-            <h2>{{ statistics_panel.title }}</h2>
-            <p>{{ statistics_panel.description }}</p>
+            <h2>Estadisticas guardadas</h2>
+            <p>Guarda configuraciones de analisis por base para volver rapido a ellas.</p>
         </div>
-        {% if statistics_panel.kind == 'distribution' %}
-            <div class="stats-bars">
-                {% for item in statistics_panel.items %}
-                    <article class="stats-bar-card">
-                        <div class="member-row">
-                            <strong>{{ item.label }}</strong>
-                            <span class="pill">{{ item.count }} · {{ item.percent }}%</span>
+        <section class="detail-grid">
+            <article>
+                <form method="post" action="{% url 'saved_statistic_create' database.slug %}" class="stack-form compact">
+                    {% csrf_token %}
+                    <input type="hidden" name="stats_field" value="{{ selected_stats_field }}">
+                    <input type="hidden" name="chart_type" value="{{ stats_chart_type }}">
+                    <input type="hidden" name="stats_query" value="{{ stats_query }}">
+                    <input type="hidden" name="stats_priority" value="{{ stats_priority }}">
+                    <input type="hidden" name="stats_date_from" value="{{ stats_date_from }}">
+                    <input type="hidden" name="stats_date_to" value="{{ stats_date_to }}">
+                    {% for field in saved_statistic_form %}
+                        <label class="field">
+                            <span>{{ field.label }}</span>
+                            {{ field }}
+                            {{ field.errors }}
+                        </label>
+                    {% endfor %}
+                    <button type="submit" class="button">Guardar esta estadistica</button>
+                </form>
+            </article>
+            <article>
+                <div class="stack-form compact">
+                    {% for item in saved_statistics %}
+                        <article class="database-card saved-stat-card {% if selected_saved_statistic and selected_saved_statistic.pk == item.pk %}is-selected{% endif %}">
+                            <div class="member-row">
+                                <strong>{{ item.name }}</strong>
+                                {% if selected_saved_statistic and selected_saved_statistic.pk == item.pk %}
+                                    <span class="pill is-active">Actual</span>
+                                {% endif %}
+                            </div>
+                            <p>{{ item.get_chart_type_display }} ? {{ item.field_key }}</p>
+                            <div class="hero-actions">
+                                <a href="?tab=summary&saved_stat={{ item.pk }}">Abrir</a>
+                                <form method="post" action="{% url 'saved_statistic_delete' database.slug item.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="field-delete-button">Eliminar</button>
+                                </form>
+                            </div>
+                        </article>
+                    {% empty %}
+                        <div class="empty-state">
+                            <h3>Todavia no guardaste estadisticas</h3>
+                            <p>Configura un analisis, ponle nombre y quedara disponible para reutilizarlo en esta base.</p>
                         </div>
-                        <div class="stats-bar-track">
-                            <div class="stats-bar-fill" style="width: {{ item.width }}%;"></div>
-                        </div>
-                    </article>
-                {% empty %}
-                    <div class="empty-state">
-                        <h3>No hay datos suficientes para este analisis</h3>
-                        <p>Prueba con otro campo o carga mas registros para ver distribuciones utiles.</p>
-                    </div>
-                {% endfor %}
-            </div>
-        {% elif statistics_panel.kind == 'numeric' %}
-            <div class="stats-grid">
-                {% for metric in statistics_panel.metrics %}
-                    <article class="stat-card">
-                        <strong>{{ metric.value }}</strong>
-                        <span>{{ metric.label }}</span>
-                    </article>
-                {% empty %}
-                    <div class="empty-state">
-                        <h3>No hay valores numericos todavia</h3>
-                        <p>Cuando este campo tenga datos validos, aqui veras suma, promedio y rango.</p>
-                    </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="empty-state">
-                <h3>Selecciona un campo para empezar</h3>
-                <p>El analizador mostrara conteos, distribuciones o metricas segun el tipo de dato.</p>
-            </div>
-        {% endif %}
-    </section>
-
-    <section class="detail-grid">
-        <article class="panel">
-            <div class="panel-head">
-                <h2>Que puedes leer aqui</h2>
-                <p>Esta primera version cubre las lecturas mas utiles para una base operativa.</p>
-            </div>
-            <div class="stack-form compact">
-                <article class="database-card">
-                    <h3>Conteos por estados y opciones</h3>
-                    <p>Ideal para campos de seleccion, si/no y prioridades.</p>
-                </article>
-                <article class="database-card">
-                    <h3>Lectura de relaciones</h3>
-                    <p>Puedes ver como se distribuyen los registros relacionados mas usados.</p>
-                </article>
-                <article class="database-card">
-                    <h3>Metricas numericas</h3>
-                    <p>En numeros y monedas obtienes suma, promedio, minimo y maximo.</p>
-                </article>
-                <article class="database-card">
-                    <h3>Fechas recientes</h3>
-                    <p>Los campos de fecha y la creacion de registros muestran evolucion reciente.</p>
-                </article>
-            </div>
-        </article>
-        <article class="panel">
-            <div class="panel-head">
-                <h2>Siguientes pasos recomendados</h2>
-                <p>Una vez leida la base, el flujo natural suele continuar por estas acciones.</p>
-            </div>
-            <div class="stack-form compact">
-                <a class="database-card" href="?tab=records">
-                    <h3>Ir a Registros</h3>
-                    <p>Abre la vista operativa para buscar, revisar y agregar informacion.</p>
-                </a>
-                <a class="database-card" href="?tab=structure">
-                    <h3>Mejorar la estructura</h3>
-                    <p>Agrega campos o relaciones si quieres analisis mas ricos.</p>
-                </a>
-                <a class="database-card" href="?tab=history">
-                    <h3>Revisar historial</h3>
-                    <p>Consulta quien hizo cambios y como evoluciono la base.</p>
-                </a>
-            </div>
-        </article>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
     </section>
 {% endif %}
 
@@ -192,6 +354,44 @@
         </div>
     </section>
 {% endif %}
+
+<div class="related-preview-card" id="section-help-card" hidden>
+    <div class="related-preview-backdrop" data-section-help-close></div>
+    <div class="related-preview-panel history-preview-panel">
+        <div class="member-row">
+            <div>
+                <span class="eyebrow">Ayuda</span>
+                <h3>{{ section_help.title }}</h3>
+            </div>
+            <button type="button" class="modal-close-button" aria-label="Cerrar" data-section-help-close>X</button>
+        </div>
+        <div class="stack-form compact top-gap">
+            {% for item in section_help.items %}
+                <article class="database-card">
+                    <p>{{ item }}</p>
+                </article>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+<script>
+    (() => {
+        const helpCard = document.getElementById("section-help-card");
+        const helpOpen = document.querySelector("[data-section-help-open]");
+        if (!helpCard || !helpOpen) {
+            return;
+        }
+        const closeHelp = () => {
+            helpCard.hidden = true;
+        };
+        helpOpen.addEventListener("click", () => {
+            helpCard.hidden = false;
+        });
+        document.querySelectorAll("[data-section-help-close]").forEach((item) => {
+            item.addEventListener("click", closeHelp);
+        });
+    })();
+</script>
 
 {% if active_tab == 'records' %}
     <section class="panel">
@@ -446,7 +646,7 @@
             <h2>Historial de la base</h2>
             <p>Aqui veras los movimientos realizados, quien los hizo y cuando ocurrieron.</p>
         </div>
-        <section class="stats-grid">
+        <section class="stats-grid stats-grid-4">
             <article class="stat-card"><strong>{{ history_stats.total }}</strong><span>Movimientos totales</span></article>
             <article class="stat-card"><strong>{{ history_stats.today }}</strong><span>Hechos hoy</span></article>
             <article class="stat-card"><strong>{{ history_stats.actors }}</strong><span>Usuarios con actividad</span></article>
@@ -846,6 +1046,16 @@
                 <p>Acciones de alto impacto sobre esta base. Revisa bien antes de continuar.</p>
             </div>
             {% if membership.role == 'admin' %}
+                <form method="post" action="{% url 'database_rename' database.slug %}" class="stack-form compact">
+                    {% csrf_token %}
+                    <label class="field">
+                        <span>Cambiar nombre de la base</span>
+                        <input type="text" name="new_name" value="{{ database.name }}" maxlength="120" required>
+                    </label>
+                    <div class="hero-actions">
+                        <button type="submit" class="button">Guardar nuevo nombre</button>
+                    </div>
+                </form>
                 <div class="empty-state danger-zone">
                     <h3>Eliminar esta base</h3>
                     <p>Se eliminaran su estructura, registros, vistas guardadas y membresias. Esta accion no se puede deshacer.</p>

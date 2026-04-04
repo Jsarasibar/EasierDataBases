@@ -5,7 +5,7 @@ from django.urls import reverse
 import json
 
 from .forms import CustomFieldForm
-from .models import AppDatabase, CustomField, DatabaseActivity, DatabaseMembership, Record
+from .models import AppDatabase, CustomField, DatabaseActivity, DatabaseMembership, Record, SavedStatistic
 from .views import _base_field_keys
 
 
@@ -259,9 +259,110 @@ class DatabaseFlowTests(TestCase):
         response = self.client.get(reverse("database_detail", args=[database.slug]), {"tab": "summary"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Analizador de campo")
+        self.assertContains(response, "Constructor de estadisticas")
         self.assertContains(response, "Distribucion por prioridad")
         self.assertContains(response, "Urgente")
+
+    def test_summary_tab_supports_chart_type_and_filters(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(
+            name="Base filtros",
+            slug="base-filtros",
+            created_by=self.user,
+            has_priority=True,
+        )
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            required=True,
+            position=1,
+            is_primary=True,
+        )
+        CustomField.objects.create(
+            database=database,
+            label="Categoria",
+            key="categoria",
+            field_type=CustomField.FieldType.SELECT,
+            options_text="Bebidas\nAccesorios",
+            required=False,
+            position=2,
+        )
+        Record.objects.create(
+            database=database,
+            title="Cafe",
+            priority=Record.Priority.URGENT,
+            data={"nombre": "Cafe", "categoria": "Bebidas"},
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        Record.objects.create(
+            database=database,
+            title="Taza",
+            priority=Record.Priority.NORMAL,
+            data={"nombre": "Taza", "categoria": "Accesorios"},
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        response = self.client.get(
+            reverse("database_detail", args=[database.slug]),
+            {
+                "tab": "summary",
+                "stats_field": "categoria",
+                "chart_type": "table",
+                "stats_query": "Cafe",
+                "stats_priority": Record.Priority.URGENT,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Tipo de grafico")
+        self.assertContains(response, "1 registros analizados")
+        self.assertContains(response, "<th>Peso relativo</th>", html=False)
+        self.assertContains(response, "Bebidas")
+        self.assertNotContains(response, "Accesorios</td>")
+
+    def test_user_can_save_and_reopen_statistic(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base guardada", slug="base-guardada", created_by=self.user, has_priority=True)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            required=True,
+            position=1,
+            is_primary=True,
+        )
+
+        save_response = self.client.post(
+            reverse("saved_statistic_create", args=[database.slug]),
+            {
+                "name": "Urgentes de hoy",
+                "stats_field": "__priority__",
+                "chart_type": "donut",
+                "stats_query": "",
+                "stats_priority": Record.Priority.URGENT,
+                "stats_date_from": "2026-04-01",
+                "stats_date_to": "2026-04-30",
+            },
+        )
+
+        self.assertEqual(save_response.status_code, 302)
+        statistic = SavedStatistic.objects.get(database=database, user=self.user, name="Urgentes de hoy")
+        self.assertEqual(statistic.chart_type, "donut")
+        self.assertEqual(statistic.priority, Record.Priority.URGENT)
+        self.assertEqual(statistic.date_from.isoformat(), "2026-04-01")
+        self.assertIn(f"saved_stat={statistic.pk}", save_response.url)
+
+        detail_response = self.client.get(reverse("database_detail", args=[database.slug]), {"tab": "summary", "saved_stat": statistic.pk})
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, "Urgentes de hoy")
+        self.assertContains(detail_response, "Actual")
 
     def test_database_statistics_route_redirects_to_summary_tab(self):
         self.client.login(username="admin", password="secret123")
@@ -1348,3 +1449,19 @@ class DatabaseFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(AppDatabase.objects.filter(pk=database.pk).exists())
+
+    def test_admin_can_rename_database_from_sensitive_zone(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base original", slug="base-original", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+
+        response = self.client.post(
+            reverse("database_rename", args=[database.slug]),
+            {"new_name": "Base renombrada"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        database.refresh_from_db()
+        self.assertEqual(database.name, "Base renombrada")
+        self.assertEqual(database.slug, "base-renombrada")
+        self.assertIn("/bases/base-renombrada/?tab=manage", response.url)
