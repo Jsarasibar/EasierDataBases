@@ -74,5 +74,83 @@
             syncLabel();
         })();
     </script>
+    <script>
+        (() => {
+            const STORAGE_KEY = "edb-scroll-restore";
+            const BASES_PREFIX = "/bases/";
+
+            const isDatabasePage = (pathname) => pathname.startsWith(BASES_PREFIX);
+
+            const currentPath = window.location.pathname;
+
+            const restoreScroll = () => {
+                if (!isDatabasePage(currentPath)) {
+                    return;
+                }
+
+                const raw = sessionStorage.getItem(STORAGE_KEY);
+                if (!raw) {
+                    return;
+                }
+
+                let payload;
+                try {
+                    payload = JSON.parse(raw);
+                } catch (error) {
+                    sessionStorage.removeItem(STORAGE_KEY);
+                    return;
+                }
+
+                if (!payload || payload.y === undefined || !payload.timestamp) {
+                    sessionStorage.removeItem(STORAGE_KEY);
+                    return;
+                }
+
+                if (Date.now() - payload.timestamp > 15000) {
+                    sessionStorage.removeItem(STORAGE_KEY);
+                    return;
+                }
+
+                sessionStorage.removeItem(STORAGE_KEY);
+
+                const scrollToSavedPosition = () => {
+                    window.scrollTo({ top: Number(payload.y) || 0, left: 0, behavior: "auto" });
+                };
+
+                window.requestAnimationFrame(() => {
+                    scrollToSavedPosition();
+                    window.setTimeout(scrollToSavedPosition, 60);
+                });
+            };
+
+            const registerForms = () => {
+                if (!isDatabasePage(currentPath)) {
+                    return;
+                }
+
+                document.querySelectorAll("form").forEach((form) => {
+                    form.addEventListener("submit", () => {
+                        sessionStorage.setItem(
+                            STORAGE_KEY,
+                            JSON.stringify({
+                                y: window.scrollY,
+                                timestamp: Date.now(),
+                            }),
+                        );
+                    });
+                });
+            };
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", () => {
+                    restoreScroll();
+                    registerForms();
+                });
+            } else {
+                restoreScroll();
+                registerForms();
+            }
+        })();
+    </script>
 </body>
 </html>

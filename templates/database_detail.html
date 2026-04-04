@@ -81,7 +81,7 @@
                 <div class="stats-builder-grid">
                     <label class="field">
                         <span>Dato a analizar</span>
-                        <select name="stats_field">
+                        <select name="stats_field" id="stats-field-select">
                             <option value="" {% if not selected_stats_field %}selected{% endif %}>Seleccionar campo</option>
                             {% for value, label in statistics_field_options %}
                                 <option value="{{ value }}" {% if selected_stats_field == value %}selected{% endif %}>{{ label }}</option>
@@ -90,7 +90,7 @@
                     </label>
                     <label class="field">
                         <span>Tipo de grafico</span>
-                        <select name="chart_type">
+                        <select name="chart_type" id="stats-chart-type-select">
                             {% for value, label in stats_chart_type_options %}
                                 <option value="{{ value }}" {% if stats_chart_type == value %}selected{% endif %}>{{ label }}</option>
                             {% endfor %}
@@ -125,11 +125,92 @@
                         </label>
                     </div>
                 </details>
+                <details class="stats-advanced-details" id="stats-comparison-details">
+                    <summary>Comparacion</summary>
+                    <div class="stats-builder-grid stats-builder-grid-advanced">
+                        <label class="field">
+                            <span>Modo de comparacion</span>
+                            <select name="compare_mode" id="stats-compare-mode-select">
+                                {% for value, label in compare_mode_options %}
+                                    <option value="{{ value }}" {% if compare_mode == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <div class="comparison-manual-fields" {% if compare_mode != 'manual' %}hidden{% endif %}>
+                            <label class="field comparison-manual-field">
+                                <span>Comparar desde</span>
+                                <input type="date" name="compare_date_from" value="{{ compare_date_from }}">
+                            </label>
+                            <label class="field comparison-manual-field">
+                                <span>Comparar hasta</span>
+                                <input type="date" name="compare_date_to" value="{{ compare_date_to }}">
+                            </label>
+                        </div>
+                    </div>
+                </details>
                 <div class="hero-actions">
-                    <button type="submit" class="button">Actualizar analisis</button>
+                    <button type="submit" name="analyze" value="1" class="button">Analizar</button>
                     <a class="button subtle" href="?tab=summary">Limpiar filtros</a>
                 </div>
             </form>
+            {{ stats_chart_options_map|json_script:"stats-chart-options-map" }}
+            <script>
+                (() => {
+                    const fieldSelect = document.getElementById("stats-field-select");
+                    const chartSelect = document.getElementById("stats-chart-type-select");
+                    const compareModeSelect = document.getElementById("stats-compare-mode-select");
+                    const manualFieldsWrapper = document.querySelector(".comparison-manual-fields");
+                    const manualFields = manualFieldsWrapper ? manualFieldsWrapper.querySelectorAll("input") : [];
+                    const optionsNode = document.getElementById("stats-chart-options-map");
+                    if (!fieldSelect || !chartSelect || !optionsNode) {
+                        return;
+                    }
+                    const optionsMap = JSON.parse(optionsNode.textContent);
+                    const currentChartValue = () => chartSelect.value;
+                    const renderChartOptions = () => {
+                        const fieldKey = fieldSelect.value || "";
+                        const availableOptions = optionsMap[fieldKey] || optionsMap[""] || [];
+                        const previousValue = currentChartValue();
+                        chartSelect.innerHTML = "";
+                        availableOptions.forEach((item, index) => {
+                            const option = document.createElement("option");
+                            option.value = item.value;
+                            option.textContent = item.label;
+                            if (item.value === previousValue || (!previousValue && index === 0)) {
+                                option.selected = true;
+                            }
+                            chartSelect.appendChild(option);
+                        });
+                        if (!chartSelect.value && chartSelect.options.length) {
+                            chartSelect.options[0].selected = true;
+                        }
+                    };
+                    fieldSelect.addEventListener("change", renderChartOptions);
+                    renderChartOptions();
+                    const comparisonDetails = document.getElementById("stats-comparison-details");
+                    if (compareModeSelect) {
+                        const syncComparisonFields = () => {
+                            const showManual = compareModeSelect.value === "manual";
+                            if (manualFieldsWrapper) {
+                                manualFieldsWrapper.hidden = !showManual;
+                            }
+                            manualFields.forEach((field) => {
+                                field.disabled = !showManual;
+                            });
+                        };
+                        compareModeSelect.addEventListener("change", syncComparisonFields);
+                        syncComparisonFields();
+                        if (comparisonDetails) {
+                            comparisonDetails.addEventListener("toggle", () => {
+                                if (comparisonDetails.open && !compareModeSelect.value) {
+                                    compareModeSelect.value = "last_7";
+                                    syncComparisonFields();
+                                }
+                            });
+                        }
+                    }
+                })();
+            </script>
         </article>
 
         <article class="panel stats-result-panel">
@@ -138,13 +219,17 @@
                     <h2>{{ statistics_panel.title }}</h2>
                     <p>{{ statistics_panel.description }}</p>
                 </div>
-                <span class="pill is-active">{{ stats_filtered_count }} registros analizados</span>
+                <div class="hero-actions">
+                    <span class="pill is-active">{{ stats_filtered_count }} registros analizados</span>
+                    <button type="button" class="button subtle" data-stats-preview-open>Expandir</button>
+                </div>
             </div>
+            <div id="stats-result-content">
             {% if statistics_panel.kind == 'distribution' %}
                 {% if statistics_panel.chart_type == 'donut' %}
                     {% if statistics_panel.donut.legend %}
                         <div class="stats-donut-layout">
-                            <div class="stats-pie-visual" role="img" aria-label="Grafico de torta" style="background: conic-gradient({{ statistics_panel.donut.gradient }});"></div>
+                            <div class="stats-pie-visual" role="img" aria-label="Grafico de torta" style="--stats-pie-gradient: conic-gradient({{ statistics_panel.donut.gradient }});"></div>
                             <div class="stats-donut-legend">
                                 {% for item in statistics_panel.donut.legend %}
                                     <article class="stats-legend-item">
@@ -253,6 +338,7 @@
                     <p>El analizador mostrara conteos, distribuciones o metricas segun el tipo de dato.</p>
                 </div>
             {% endif %}
+            </div>
         </article>
 
         <article class="panel stats-insight-panel">
@@ -269,6 +355,116 @@
             </div>
         </article>
     </section>
+    {% if comparison_requested %}
+        <section class="panel top-gap comparison-panel">
+            <div class="panel-head">
+                <div>
+                    <h2>Comparacion</h2>
+                    <p>Compara el analisis actual con otro periodo para ver cambios de volumen, peso relativo y comportamiento.</p>
+                </div>
+            </div>
+            {% if comparison_summary %}
+                <section class="stats-grid stats-grid-4 comparison-summary-grid">
+                    <article class="stat-card">
+                        <strong>{{ comparison_summary.current_count }}</strong>
+                        <span>{{ comparison_summary.current_label }}</span>
+                    </article>
+                    <article class="stat-card">
+                        <strong>{{ comparison_summary.comparison_count }}</strong>
+                        <span>{{ comparison_summary.comparison_label }}</span>
+                    </article>
+                    <article class="stat-card">
+                        <strong>{{ comparison_summary.delta_count }}</strong>
+                        <span>Diferencia absoluta</span>
+                    </article>
+                    <article class="stat-card">
+                        <strong>{% if comparison_summary.delta_percent_label != '-' %}{{ comparison_summary.delta_percent_label }}%{% else %}-{% endif %}</strong>
+                        <span>Variacion porcentual</span>
+                    </article>
+                </section>
+                <section class="detail-grid top-gap comparison-grid">
+                    <article class="panel">
+                        <div class="panel-head">
+                            <h3>Resumen comparativo</h3>
+                            <p>Lectura del periodo actual frente al comparado.</p>
+                        </div>
+                        <div class="stack-form compact">
+                            {% for item in comparison_summary.insights %}
+                                <article class="database-card">
+                                    <p>{{ item }}</p>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </article>
+                    <article class="panel">
+                        <div class="panel-head">
+                            <h3>Detalle por dato</h3>
+                            <p>Comparacion item por item del analisis seleccionado.</p>
+                        </div>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    {% if comparison_summary.kind == 'numeric' %}
+                                        <tr>
+                                            <th>Metrica</th>
+                                            <th>Actual</th>
+                                            <th>Comparado</th>
+                                            <th>Diferencia</th>
+                                        </tr>
+                                    {% else %}
+                                        <tr>
+                                            <th>Dato</th>
+                                            <th>Actual</th>
+                                            <th>Comparado</th>
+                                            <th>Variacion</th>
+                                        </tr>
+                                    {% endif %}
+                                </thead>
+                                <tbody>
+                                    {% for item in comparison_summary.items %}
+                                        <tr>
+                                            <td>{{ item.label }}</td>
+                                            {% if comparison_summary.kind == 'numeric' %}
+                                                <td>{{ item.current_value }}</td>
+                                                <td>{{ item.previous_value }}</td>
+                                                <td>{{ item.delta }}</td>
+                                            {% else %}
+                                                <td>{{ item.current_count }} · {{ item.current_percent }}%</td>
+                                                <td>{{ item.previous_count }} · {{ item.previous_percent }}%</td>
+                                                <td>{{ item.delta_points }} pp</td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </article>
+                </section>
+            {% else %}
+                <div class="empty-state">
+                    <h3>No se pudo construir la comparacion</h3>
+                    <p>Revisa el modo elegido o define un rango comparable para ver cambios entre periodos.</p>
+                </div>
+            {% endif %}
+        </section>
+    {% endif %}
+    <div class="related-preview-card" id="stats-preview-card" hidden>
+        <div class="related-preview-backdrop" data-stats-preview-close></div>
+        <div class="related-preview-panel stats-preview-panel">
+            <div class="member-row">
+                <div>
+                    <p>Vista ampliada</p>
+                    <h3 id="stats-preview-title">{{ statistics_panel.title }}</h3>
+                </div>
+                <button type="button" class="modal-close-button" aria-label="Cerrar" data-stats-preview-close>X</button>
+            </div>
+            <p class="history-preview-description" id="stats-preview-description">{{ statistics_panel.description }}</p>
+            <div class="member-row">
+                <span class="pill is-active" id="stats-preview-count">{{ stats_filtered_count }} registros analizados</span>
+            </div>
+            <div class="top-gap" id="stats-preview-content"></div>
+        </div>
+    </div>
     <section class="panel top-gap">
         <div class="panel-head">
             <h2>Estadisticas guardadas</h2>
@@ -323,6 +519,42 @@
             </article>
         </section>
     </section>
+    <script>
+        (() => {
+            const openButton = document.querySelector("[data-stats-preview-open]");
+            const previewCard = document.getElementById("stats-preview-card");
+            const sourceContent = document.getElementById("stats-result-content");
+            if (!openButton || !previewCard || !sourceContent) {
+                return;
+            }
+
+            const previewContent = document.getElementById("stats-preview-content");
+            const closeButtons = Array.from(document.querySelectorAll("[data-stats-preview-close]"));
+
+            const openPreview = () => {
+                previewContent.innerHTML = sourceContent.innerHTML;
+                previewCard.hidden = false;
+                document.body.style.overflow = "hidden";
+            };
+
+            const closePreview = () => {
+                previewCard.hidden = true;
+                previewContent.innerHTML = "";
+                document.body.style.overflow = "";
+            };
+
+            openButton.addEventListener("click", openPreview);
+            closeButtons.forEach((button) => {
+                button.addEventListener("click", closePreview);
+            });
+
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape" && !previewCard.hidden) {
+                    closePreview();
+                }
+            });
+        })();
+    </script>
 {% endif %}
 
 {% if active_tab == 'daily' %}

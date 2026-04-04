@@ -1,306 +1,446 @@
-# Proximas actualizaciones para seguir escalando EasierDataBases
+# Proximas actualizaciones de EasierDataBases
 
-Este documento resume las siguientes mejoras recomendadas para continuar escalando el proyecto desde su estado actual de MVP avanzado hacia un producto mas solido, vendible y mantenible.
+## Objetivo de este documento
 
-La idea no es agregar funciones por agregar, sino priorizar lo que mas impacto real tiene en:
+Este roadmap redefine los siguientes pasos del proyecto desde su estado actual real.
 
-- adopcion,
-- confiabilidad,
-- escalabilidad,
-- y valor comercial.
+Se eliminaron del plan las mejoras que ya quedaron implementadas, como:
+
+- estadisticas funcionales,
+- comparacion basica entre periodos,
+- historial enriquecido,
+- dark mode,
+- scroll restore al enviar formularios,
+- relaciones entre bases con preview y alta inline,
+- importacion/exportacion CSV,
+- y la base general del producto no-code.
+
+Lo que sigue ahora no es “agregar por agregar”, sino ordenar lo pendiente para escalar el producto con criterio.
+
+---
 
 ## Estado actual resumido
 
-Hoy EasierDataBases ya cubre bastante bien el nucleo del producto:
+Hoy EasierDataBases ya cuenta con:
 
-- creacion guiada de bases,
+- autenticacion y recuperacion de contrasena,
+- dashboard funcional,
+- asistente de creacion de bases,
 - plantillas iniciales,
 - campos personalizados,
-- registros,
+- columna principal del registro configurable,
+- prioridades opcionales por base,
 - relaciones entre bases,
-- importacion/exportacion CSV,
-- historial,
-- roles basicos,
+- registros con tabla y tarjetas,
+- filtros, orden y paginacion,
+- importacion y exportacion CSV,
+- estadisticas reales con comparacion basica,
+- historial por base,
+- roles admin/editor,
 - dark mode,
-- y una UI bastante mas trabajada que un CRUD tecnico.
+- y una UI bastante evolucionada.
 
-Eso lo hace apto para:
+Con este estado, el producto ya sirve para:
 
 - demos comerciales,
-- validacion con usuarios reales,
 - pilotos cerrados,
-- y primeras iteraciones de producto.
+- validacion con usuarios reales,
+- y casos de uso simples o medianos.
 
-Lo que sigue ahora es fortalecerlo en capas.
+El siguiente tramo no apunta a “inventar features”, sino a volver el producto:
 
-## Prioridad general
+- mas solido,
+- mas comodo,
+- mas vendible,
+- y mas preparado para escalar.
 
-Orden recomendado de trabajo:
+---
 
-1. fortalecer analitica y reporting basico,
-2. mejorar experiencia operativa no-code,
-3. endurecer arquitectura SaaS,
-4. ampliar colaboracion y trazabilidad,
-5. incorporar automatizaciones,
-6. cerrar el gap comercial del producto.
+## Orden recomendado de implementacion
 
-## Fase 1. Estadisticas reales y lectura de datos
+El orden propuesto desde este punto es:
 
-Hoy la vista de `Estadisticas` esta presentada pero todavia no calcula informacion real.
+1. mejorar la experiencia de uso diario
+2. robustecer y completar el modulo de estadisticas
+3. fortalecer colaboracion, permisos y trazabilidad
+4. consolidar arquitectura SaaS y multi-tenant
+5. sumar automatizaciones simples y utiles
+6. reforzar comercializacion y onboarding
+7. seguir reduciendo deuda tecnica y mejorar mantenibilidad
 
-### Objetivo
+---
 
-Permitir que una base no solo almacene datos, sino que tambien muestre informacion util para analizarla.
-
-### Actualizaciones recomendadas
-
-- habilitar graficos por campo:
-  - cantidad por estado,
-  - distribucion por categoria,
-  - conteo por tipo de relacion,
-  - totales de campos numericos o monetarios.
-- permitir elegir uno o varios campos para analizar.
-- agregar filtros previos al grafico.
-- sumar tarjetas de resumen:
-  - total de registros,
-  - activos,
-  - pendientes,
-  - urgentes,
-  - ultimos movimientos.
-- permitir guardar configuraciones de analisis frecuentes.
-
-### Impacto
-
-- mejora el valor percibido del producto,
-- ayuda a mostrarlo mejor en demos,
-- y empieza a cubrir necesidades reales de seguimiento.
-
-## Fase 2. Mejoras de experiencia operativa
-
-Esta fase busca que usar el producto todos los dias sea cada vez mas natural.
+## Paso 1. Mejorar la experiencia de uso diario
 
 ### Objetivo
 
-Reducir friccion para usuarios no tecnicos y hacer mas rapidos los flujos frecuentes.
+Hacer que operar registros y relaciones todos los dias sea mas rapido y mas natural para usuarios no tecnicos.
 
-### Actualizaciones recomendadas
+### Que implementar
 
-- autocompletado/buscador en campos de relacion cuando la base relacionada tiene muchos registros.
-- creacion inline mas rica para relacionados:
-  - cerrar el modal y refrescar otros datos del formulario sin recargar todo.
-- acciones mas rapidas en tabla:
-  - duplicar registro,
-  - cambio rapido de prioridad,
-  - cambio rapido de estado.
-- edicion inline de ciertos campos simples directamente en la tabla.
-- reordenar campos visualmente en `Estructura`.
-- duplicar campos.
-- ocultar o archivar campos.
-- mejorar estados vacios con mas guia contextual.
-- filtros mas amigables:
-  - por rango,
-  - por fecha,
-  - por campos de seleccion,
-  - por relacionados.
+1. Buscador/autocomplete en campos de relacion
 
-### Impacto
+- cuando una base relacionada tenga muchos registros, el selector actual se vuelve pesado
+- hace falta una busqueda por texto dentro del selector
+- deberia permitir encontrar rapido por ID o nombre visible del registro
 
-- aumenta la sensacion de producto maduro,
-- mejora el uso diario,
-- y baja la barrera para usuarios administrativos.
+2. Acciones rapidas en la tabla de registros
 
-## Fase 3. Arquitectura SaaS y multi-tenant mas fuerte
+- duplicar registro
+- editar prioridad desde la tabla si la base usa prioridad
+- editar algun campo simple inline cuando tenga sentido
 
-Hoy el producto ya tiene aislamiento por membresia de base, pero todavia no una capa SaaS mas formal.
+3. Filtros mas potentes en `Registros`
 
-### Objetivo
+- filtros por campos de seleccion
+- filtros por relacionados
+- filtros por rango numerico
+- filtros por fecha
 
-Preparar el proyecto para crecer con mas usuarios, mas cuentas y mejor separacion entre clientes.
+4. Reordenado visual de campos en `Estructura`
 
-### Actualizaciones recomendadas
+- mover campos arriba o abajo
+- idealmente con botones primero, no con drag and drop complejo
 
-- introducir `Workspace` u `Organization`.
-- hacer que cada base pertenezca a un workspace.
-- mover membresias y permisos a nivel workspace y base.
-- preparar invitaciones por email.
-- endurecer restricciones multi-tenant en queries y formularios.
-- separar mejor configuracion de desarrollo, staging y produccion.
-- revisar indices y rendimiento para bases mas grandes.
-- monitorear tiempos de respuesta en vistas mas pesadas.
+5. Duplicado y archivado de campos
 
-### Impacto
+- duplicar un campo para acelerar modelado
+- archivar/ocultar campos sin borrarlos
 
-- mejora seguridad y orden del modelo,
-- facilita cobro futuro por cuenta o equipo,
-- y evita problemas cuando crezca la cantidad de clientes.
+### Por que va primero
 
-## Fase 4. Colaboracion, auditoria y gobierno de datos
+Porque mejora el uso diario del producto sin aumentar todavia mucho la complejidad tecnica.
 
-El historial actual ya registra movimientos, pero todavia puede crecer bastante.
+---
+
+## Paso 2. Llevar `Estadisticas` a una version mas madura
 
 ### Objetivo
 
-Dar mas control y confianza cuando varias personas trabajan sobre la misma base.
+Convertir `Estadisticas` en una herramienta de lectura realmente fuerte, no solo en un modulo analitico inicial.
 
-### Actualizaciones recomendadas
+### Que implementar
 
-- filtrar historial por tipo:
-  - registros,
-  - estructura,
-  - importaciones,
-  - permisos.
-- mostrar historial por registro individual.
-- auditar cambios con mas detalle:
-  - campo modificado,
-  - valor anterior,
-  - valor nuevo,
-  - contexto de quien lo hizo.
-- agregar rol de solo lectura.
-- permisos mas finos:
-  - quien puede importar,
-  - quien puede eliminar,
-  - quien puede cambiar estructura.
-- opcion de archivar registros en vez de borrarlos.
+1. Comparativas mas avanzadas
 
-### Impacto
+- hoy ya existe comparacion basica
+- el siguiente paso es comparacion mas integrada y mas rica
+- comparar:
+  - hoy vs ayer
+  - semana actual vs anterior
+  - mes actual vs anterior
+  - y rangos equivalentes automaticos
 
-- suma trazabilidad,
-- mejora uso en equipo,
-- y hace el producto mas confiable para operaciones reales.
+2. Mejor interpretacion automatica
 
-## Fase 5. Automatizaciones simples y utiles
+- que la interpretacion sea menos generica
+- mas frases orientadas a negocio y operacion
+- ejemplos:
+  - categoria dominante
+  - dato con mayor peso
+  - campo poco cubierto
+  - concentracion alta o baja
 
-El producto ya esta pidiendo esta capa, pero conviene entrar despues de estabilizar la operacion y la arquitectura.
+3. Estadisticas operativas contextuales
 
-### Objetivo
+- adaptadas al tipo de base y al tipo de campo
+- por ejemplo:
+  - registros sin relacion
+  - registros incompletos
+  - vencimientos cercanos
+  - urgentes
+  - registros sin actualizar
 
-Pasar de “gestionar datos” a “hacer que los datos activen acciones”.
+4. Dashboard de widgets por base
 
-### Actualizaciones recomendadas
+- poder guardar varias estadisticas y verlas juntas
+- no solo “una estadistica guardada”, sino una pequeña composicion analitica por base
 
-- reglas simples:
-  - si stock < X, marcar urgente,
-  - si estado = pendiente, destacar,
-  - si fecha vence hoy, avisar.
-- campos calculados basicos.
-- automatizaciones de cambio de estado.
-- notificaciones por email en eventos simples.
-- recordatorios para seguimiento.
-- acciones programadas sobre bases.
+5. Exportacion de analisis
 
-### Impacto
+- exportar tabla del analisis
+- exportar CSV del resultado filtrado
 
-- eleva mucho el valor del producto,
-- abre mas casos de uso,
-- y mejora diferenciacion comercial.
+### Por que va segundo
 
-## Fase 6. Comercializacion y conversion
+Porque `Estadisticas` ya existe y ahora conviene profundizarla, no reinventarla.
 
-La base funcional ya esta, pero escalar como producto tambien implica mejorar como se presenta y se vende.
+---
+
+## Paso 3. Fortalecer colaboracion, permisos y trazabilidad
 
 ### Objetivo
 
-Hacer que el producto se entienda, se pruebe y se valore mas rapido.
+Dar mas control cuando varias personas usan la misma base.
 
-### Actualizaciones recomendadas
+### Que implementar
 
-- mejorar onboarding inicial despues del registro.
-- crear demo guiada dentro del producto.
-- agregar datos demo mas realistas por plantilla.
-- sumar FAQ y casos de uso mas concretos en la landing.
-- agregar capturas o mockups reales del producto.
-- preparar una pagina de precios futura.
-- preparar una pagina de “casos de uso”.
-- dejar mas claro que se puede usar para cualquier negocio.
+1. Nuevo rol `solo lectura`
 
-### Impacto
+- hoy solo existen `admin` y `editor`
+- falta un rol seguro para consulta
 
-- mejora conversion,
-- ayuda en demos,
-- y reduce friccion comercial.
+2. Permisos mas finos por accion
 
-## Fase 7. Calidad tecnica y mantenimiento
+- quien puede importar
+- quien puede exportar
+- quien puede eliminar registros
+- quien puede cambiar estructura
+- quien puede gestionar miembros
 
-Escalar no es solo sumar features; tambien es sostenerlas bien.
+3. Historial filtrable
+
+- filtrar por tipo de movimiento:
+  - registros
+  - estructura
+  - permisos
+  - importaciones
+  - estadisticas
+
+4. Historial por registro
+
+- no solo historial por base
+- tambien un historial especifico por cada registro
+
+5. Archivado de registros
+
+- alternativa al borrado duro
+- muy util para operaciones reales
+
+### Por que va tercero
+
+Porque cuando el producto empieza a usarse en equipo, la confianza operativa pasa a ser central.
+
+---
+
+## Paso 4. Consolidar arquitectura SaaS y multi-tenant
 
 ### Objetivo
 
-Mantener el proyecto sano a medida que crece.
+Preparar el sistema para crecer con mas clientes y mejor separacion entre cuentas.
 
-### Actualizaciones recomendadas
+### Que implementar
 
-- seguir limpiando templates grandes, especialmente la vista principal de base.
-- separar mas componentes visuales compartidos.
-- ampliar tests de interfaz y permisos.
-- agregar tests para dark mode y render de tabs criticas.
-- incorporar monitoreo de errores en produccion.
-- revisar logs y eventos importantes.
-- documentar mejor decisiones internas del modelo.
+1. Introducir `Workspace` u `Organization`
 
-### Impacto
+- cada base deberia pertenecer a una organizacion
+- hoy la base es la unidad funcional principal, pero falta una capa superior
 
-- reduce deuda tecnica,
-- mejora mantenimiento,
-- y hace mas seguras las iteraciones futuras.
+2. Membresias por workspace
 
-## Roadmap sugerido de implementacion
+- administrar acceso a nivel cuenta/equipo
+- y despues bajar permisos a nivel base
 
-Si hubiera que avanzar en un orden muy concreto, mi recomendacion seria:
+3. Invitaciones por email
 
-### Etapa 1. Valor visible inmediato
+- para sumar usuarios a un workspace o base
 
-1. estadisticas reales,
-2. buscador/autocomplete en relaciones,
-3. filtros mas potentes,
-4. mejoras de tabla para operacion diaria.
+4. Endurecer queries multi-tenant
 
-### Etapa 2. Solidez SaaS
+- revisar todas las consultas sensibles
+- asegurar aislamiento fuerte entre clientes
 
-1. workspaces/organizations,
-2. rol de solo lectura,
-3. historial filtrable y mas profundo,
-4. mejores permisos.
+5. Rendimiento e indices
 
-### Etapa 3. Diferencial de producto
+- revisar indices en bases, membresias, historial y registros
+- preparar mejor el comportamiento con volumen mayor
 
-1. automatizaciones simples,
-2. campos calculados,
-3. notificaciones,
-4. onboarding mas fuerte y demo guiada.
+### Por que va cuarto
+
+Porque es una capa importante, pero conviene encararla cuando la experiencia diaria y la operacion colaborativa ya estan mas firmes.
+
+---
+
+## Paso 5. Incorporar automatizaciones simples y utiles
+
+### Objetivo
+
+Dar el siguiente salto de valor: no solo guardar informacion, sino reaccionar a ella.
+
+### Que implementar
+
+1. Reglas simples por base
+
+- si stock < X, marcar urgente
+- si fecha vence hoy, destacar
+- si estado = pendiente, mostrar en trabajo diario
+
+2. Campos calculados basicos
+
+- por ejemplo:
+  - subtotal
+  - margen
+  - dias restantes
+  - cantidad de relacionados
+
+3. Acciones automatizadas sencillas
+
+- cambiar estado
+- asignar prioridad
+- destacar registros
+
+4. Notificaciones basicas
+
+- email simple en eventos importantes
+- recordatorios operativos
+
+### Por que va quinto
+
+Porque las automatizaciones tienen mucho valor comercial, pero conviene apoyarlas sobre una base estable de permisos, estructura y analitica.
+
+---
+
+## Paso 6. Reforzar onboarding, demo y conversion comercial
+
+### Objetivo
+
+Hacer que el producto se entienda y se valore mas rapido.
+
+### Que implementar
+
+1. Onboarding posterior al registro
+
+- recorrido guiado inicial
+- sugerencia de primer caso de uso
+- primera base recomendada
+
+2. Demo guiada dentro del producto
+
+- recorrido cerrado con una base precargada
+- mostrar:
+  - registros
+  - relaciones
+  - estadisticas
+  - historial
+
+3. Landing mas comercial
+
+- mock real del producto
+- casos de uso concretos
+- preguntas frecuentes mas fuertes
+- CTA mejor conectado con la prueba real
+
+4. Pagina futura de precios y posicionamiento
+
+- no hace falta billing todavia
+- si conviene preparar como se explicaria el modelo comercial
+
+### Por que va sexto
+
+Porque estas mejoras ayudan mucho a vender, pero conviene apoyarlas sobre una experiencia ya mas madura.
+
+---
+
+## Paso 7. Seguir mejorando calidad tecnica y mantenimiento
+
+### Objetivo
+
+Reducir deuda tecnica y hacer mas facil iterar sin romper el sistema.
+
+### Que implementar
+
+1. Dividir templates grandes
+
+- especialmente `database_detail.html`
+- extraer parciales por seccion:
+  - estadisticas
+  - registros
+  - estructura
+  - historial
+
+2. Reforzar tests
+
+- tests de permisos finos
+- tests de workspace futuro
+- tests de estadisticas avanzadas
+- tests de automatizaciones
+
+3. Mejor monitoreo de errores
+
+- logging mas rico
+- posible integracion futura con Sentry
+
+4. Documentacion tecnica viva
+
+- seguir manteniendo README, guia y manual tecnico
+- documentar decisiones de modelo y reglas delicadas
+
+### Por que va septimo
+
+Porque es trabajo continuo y debe acompañar cada etapa, pero ya conviene dejarlo explicitado como bloque del roadmap.
+
+---
+
+## Orden exacto sugerido, paso a paso
+
+Si hubiera que implementarlo en un orden muy concreto desde hoy, este seria el recomendado:
+
+1. autocomplete/buscador para relaciones
+2. filtros mas ricos en `Registros`
+3. reordenado y duplicado de campos en `Estructura`
+4. comparativas mas avanzadas en `Estadisticas`
+5. interpretacion automatica mas fuerte
+6. estadisticas operativas contextuales
+7. dashboard de widgets por base
+8. rol `solo lectura`
+9. permisos mas finos por accion
+10. historial filtrable
+11. historial por registro
+12. archivado de registros
+13. introducir `Workspace` / `Organization`
+14. invitaciones por email
+15. endurecer multi-tenant y rendimiento
+16. reglas simples de automatizacion
+17. campos calculados
+18. notificaciones basicas
+19. onboarding guiado post-registro
+20. demo guiada dentro del producto
+21. landing y conversion comercial
+22. modularizacion de templates
+23. ampliar tests y monitoreo
+
+---
 
 ## Que no deberia priorizarse todavia
 
-Por ahora no conviene entrar demasiado pronto en:
+Por ahora no conviene entrar fuerte en:
 
-- dashboards ultra complejos,
-- billing completo,
-- integraciones externas grandes,
-- mobile app nativa,
-- permisos enterprise muy finos,
-- automatizaciones avanzadas con demasiada logica.
+- mobile app nativa
+- integraciones externas grandes
+- billing completo
+- dashboards enterprise complejos
+- permisos ultra-granulares de nivel corporativo
+- automatizaciones muy avanzadas tipo motor visual completo
 
-Todo eso puede venir despues, cuando el nucleo del producto y el modelo SaaS esten mas maduros.
+Eso puede venir despues, pero todavia no es lo mas rentable para este estado del producto.
 
-## Criterio general para decidir proximos pasos
+---
 
-Cada nueva mejora deberia pasar esta prueba:
+## Criterio para decidir que entra y que no entra
 
-1. mejora el uso diario real,
-2. mejora la confianza del usuario,
-3. ayuda a vender o demostrar mejor el producto,
-4. y no agrega complejidad desproporcionada.
+Cada nueva mejora deberia pasar estas preguntas:
 
-Si una funcion suma potencia tecnica pero no mejora ninguna de esas cuatro cosas, probablemente no sea prioritaria todavia.
+1. mejora el uso real diario
+2. mejora la confianza del usuario
+3. vuelve el producto mas demostrable o vendible
+4. agrega complejidad razonable para el beneficio que aporta
 
-## Resumen corto
+Si una mejora no pasa al menos tres de esas cuatro preguntas, probablemente no sea prioritaria ahora.
 
-Las proximas actualizaciones mas importantes para seguir escalando EasierDataBases son:
+---
 
-- estadisticas funcionales,
-- mejor experiencia con relaciones y filtros,
-- workspaces/organizations,
-- permisos y auditoria mas fuertes,
-- automatizaciones simples,
-- y un onboarding mas comercial.
+## Resumen ejecutivo
 
-Ese es el camino mas claro para pasar de un MVP avanzado a un producto mas solido, mas demostrable y mas cercano a una version comercial estable.
+Desde el estado actual, EasierDataBases ya resolvio la base del producto.
+
+El siguiente tramo de crecimiento deberia enfocarse, en este orden, en:
+
+1. operacion diaria mas fluida
+2. estadisticas mas maduras
+3. colaboracion y permisos
+4. arquitectura SaaS real
+5. automatizaciones simples
+6. onboarding y conversion
+7. calidad tecnica continua
+
+Ese es hoy el camino mas claro para pasar de un MVP avanzado a un producto mucho mas solido y comercializable.

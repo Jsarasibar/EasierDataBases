@@ -253,6 +253,32 @@ def _default_statistics_field(database):
     return first_chartable or "__created_at__"
 
 
+def _statistics_kind_for_field(database, field_key):
+    if field_key == "__created_at__":
+        return "distribution"
+    if field_key == "__priority__" and database.has_priority:
+        return "distribution"
+    field = database.fields.filter(key=field_key).first()
+    if not field:
+        return "empty"
+    if field.field_type in {CustomField.FieldType.SELECT, CustomField.FieldType.BOOLEAN, CustomField.FieldType.RELATION, CustomField.FieldType.DATE}:
+        return "distribution"
+    if field.field_type in {CustomField.FieldType.NUMBER, CustomField.FieldType.CURRENCY}:
+        return "numeric"
+    return "empty"
+
+
+def _statistics_chart_options_map(database):
+    mapping = {"": [{"value": "auto", "label": "Automatico"}]}
+    for field_key, _label in _statistics_field_options(database):
+        kind = _statistics_kind_for_field(database, field_key)
+        mapping[field_key] = [
+            {"value": value, "label": label}
+            for value, label in _statistics_chart_types_for_kind(kind)
+        ]
+    return mapping
+
+
 def _statistics_bar_items(counter_items):
     if not counter_items:
         return []
@@ -306,7 +332,11 @@ def _build_donut_segments(items):
     for index, item in enumerate(items):
         color = palette[index % len(palette)]
         end = start + item["percent"]
-        parts.append(f"{color} {start}% {end}%")
+        gap = min(0.18, max(item["percent"] * 0.015, 0.06))
+        solid_end = max(start, end - gap)
+        parts.append(f"{color} {start}% {solid_end}%")
+        if solid_end < end:
+            parts.append(f"var(--stats-pie-separator) {solid_end}% {end}%")
         legend.append(
             {
                 "label": item["label"],
@@ -360,6 +390,142 @@ def _statistics_summary_rows(items):
         }
         for item in items
     ]
+
+
+def _format_date_range_label(date_from, date_to):
+    if date_from and date_to:
+        return f"{date_from.strftime('%d/%m/%Y')} a {date_to.strftime('%d/%m/%Y')}"
+    if date_from:
+        return f"Desde {date_from.strftime('%d/%m/%Y')}"
+    if date_to:
+        return f"Hasta {date_to.strftime('%d/%m/%Y')}"
+    return "Sin rango definido"
+
+
+def _resolve_statistics_comparison_range(compare_mode, *, current_from=None, current_to=None, manual_from=None, manual_to=None):
+    today = timezone.localdate()
+    if compare_mode == "manual":
+        if manual_from or manual_to:
+            return manual_from, manual_to, "Comparacion manual"
+        return None, None, ""
+    if compare_mode == "last_7":
+        current_end = today
+        current_start = today - timedelta(days=6)
+        comparison_end = current_start - timedelta(days=1)
+        comparison_start = comparison_end - timedelta(days=6)
+        return comparison_start, comparison_end, "7 dias anteriores"
+    if compare_mode == "last_30":
+        current_end = today
+        current_start = today - timedelta(days=29)
+        comparison_end = current_start - timedelta(days=1)
+        comparison_start = comparison_end - timedelta(days=29)
+        return comparison_start, comparison_end, "30 dias anteriores"
+    return None, None, ""
+
+
+def _safe_decimal(value):
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError):
+        return None
+
+
+def _build_statistics_comparison(statistics_panel, comparison_panel, *, current_count, comparison_count, current_label, comparison_label):
+    if not comparison_panel:
+        return None
+    comparison = {
+        "title": "Comparacion",
+        "current_label": current_label,
+        "comparison_label": comparison_label,
+        "current_count": current_count,
+        "comparison_count": comparison_count,
+        "delta_count": current_count - comparison_count,
+        "items": [],
+        "insights": [],
+        "kind": statistics_panel.get("kind", "empty"),
+    }
+    if comparison_count:
+        ratio = ((current_count - comparison_count) / comparison_count) * 100
+        comparison["delta_percent"] = round(ratio, 1)
+        comparison["delta_percent_label"] = f"{comparison['delta_percent']:.1f}".rstrip("0").rstrip(".")
+    else:
+        comparison["delta_percent"] = None
+        comparison["delta_percent_label"] = "-"
+
+    if statistics_panel.get("kind") == "distribution":
+        current_items = {item["label"]: item for item in statistics_panel.get("items", [])}
+        previous_items = {item["label"]: item for item in comparison_panel.get("items", [])}
+        labels = list(dict.fromkeys(list(current_items.keys()) + list(previous_items.keys())))
+        rows = []
+        for label in labels:
+            current_item = current_items.get(label, {"count": 0, "percent_label": "0"})
+            previous_item = previous_items.get(label, {"count": 0, "percent_label": "0"})
+            current_percent = _safe_decimal(current_item.get("percent", 0)) or Decimal("0")
+            previous_percent = _safe_decimal(previous_item.get("percent", 0)) or Decimal("0")
+            delta_points = current_percent - previous_percent
+            rows.append(
+                {
+                    "label": label,
+                    "current_count": current_item.get("count", 0),
+                    "current_percent": current_item.get("percent_label", "0"),
+                    "previous_count": previous_item.get("count", 0),
+                    "previous_percent": previous_item.get("percent_label", "0"),
+                    "delta_points": f"{delta_points:+.1f}".rstrip("0").rstrip("."),
+                }
+            )
+        comparison["items"] = rows
+        if rows:
+            top = rows[0]
+            comparison["insights"].append(
+                f"{top['label']} lidera en el periodo actual con {top['current_percent']}% frente a {top['previous_percent']}% en el comparado."
+            )
+        changed = [row for row in rows if row["delta_points"] not in {"+0", "0", "0.0"}]
+        if changed:
+            strongest = max(changed, key=lambda row: abs(float(row["delta_points"].replace("+", ""))))
+            comparison["insights"].append(
+                f"El cambio mas marcado esta en {strongest['label']}, con una variacion de {strongest['delta_points']} puntos porcentuales."
+            )
+        return comparison
+
+    if statistics_panel.get("kind") == "numeric":
+        current_metrics = {item["label"]: item["value"] for item in statistics_panel.get("metrics", [])}
+        previous_metrics = {item["label"]: item["value"] for item in comparison_panel.get("metrics", [])}
+        rows = []
+        for label in ["Valores cargados", "Suma total", "Promedio", "Minimo", "Maximo"]:
+            current_value = current_metrics.get(label, "-")
+            previous_value = previous_metrics.get(label, "-")
+            current_decimal = _safe_decimal(current_value)
+            previous_decimal = _safe_decimal(previous_value)
+            if current_decimal is not None and previous_decimal is not None:
+                delta = current_decimal - previous_decimal
+                delta_label = f"{delta:+.2f}".rstrip("0").rstrip(".")
+            else:
+                delta_label = "-"
+            rows.append(
+                {
+                    "label": label,
+                    "current_value": current_value,
+                    "previous_value": previous_value,
+                    "delta": delta_label,
+                }
+            )
+        comparison["items"] = rows
+        avg_row = next((row for row in rows if row["label"] == "Promedio"), None)
+        if avg_row:
+            comparison["insights"].append(
+                f"El promedio actual es {avg_row['current_value']} frente a {avg_row['previous_value']} en el periodo comparado."
+            )
+        total_row = next((row for row in rows if row["label"] == "Suma total"), None)
+        if total_row:
+            comparison["insights"].append(
+                f"La suma total cambia {total_row['delta']} respecto del periodo anterior o comparado."
+            )
+        return comparison
+
+    comparison["insights"] = [
+        "Esta comparacion todavia no tiene una vista enriquecida para el tipo de analisis seleccionado.",
+    ]
+    return comparison
 
 
 def _build_statistics_interpretation(database, statistics_panel, filtered_records, total_records):
@@ -1348,7 +1514,12 @@ def database_detail(request, slug):
         stats_priority = request.GET.get("stats_priority", "").strip()
         stats_date_from = request.GET.get("stats_date_from", "").strip()
         stats_date_to = request.GET.get("stats_date_to", "").strip()
+    compare_mode = request.GET.get("compare_mode", "").strip()
+    compare_date_from = request.GET.get("compare_date_from", "").strip()
+    compare_date_to = request.GET.get("compare_date_to", "").strip()
+    analysis_requested = bool(request.GET.get("analyze")) or bool(saved_statistic)
     statistics_field_options = _statistics_field_options(database)
+    stats_chart_options_map = _statistics_chart_options_map(database)
     valid_statistics_fields = {value for value, _label in statistics_field_options}
     if selected_stats_field and selected_stats_field not in valid_statistics_fields:
         selected_stats_field = _default_statistics_field(database)
@@ -1370,6 +1541,41 @@ def database_detail(request, slug):
         records=filtered_stats_records,
         chart_type=stats_chart_type,
     )
+    comparison_from, comparison_to, comparison_label = _resolve_statistics_comparison_range(
+        compare_mode,
+        current_from=parsed_stats_date_from,
+        current_to=parsed_stats_date_to,
+        manual_from=parse_date(compare_date_from) if compare_date_from else None,
+        manual_to=parse_date(compare_date_to) if compare_date_to else None,
+    )
+    comparison_panel = None
+    comparison_summary = None
+    if comparison_from or comparison_to:
+        comparison_queryset = _filter_statistics_queryset(
+            database.records.all().annotate(data_text=Cast("data", output_field=TextField())),
+            query=stats_query,
+            priority=stats_priority,
+            date_from=comparison_from,
+            date_to=comparison_to,
+            has_priority=database.has_priority,
+        )
+        comparison_records = list(comparison_queryset)
+        comparison_panel = _build_statistics_panel(
+            database,
+            effective_stats_field,
+            records=comparison_records,
+            chart_type=stats_chart_type,
+        )
+        current_label = _format_date_range_label(parsed_stats_date_from, parsed_stats_date_to) if (parsed_stats_date_from or parsed_stats_date_to) else "Periodo actual"
+        comparison_label = comparison_label or _format_date_range_label(comparison_from, comparison_to)
+        comparison_summary = _build_statistics_comparison(
+            statistics_panel,
+            comparison_panel,
+            current_count=len(filtered_stats_records),
+            comparison_count=len(comparison_records),
+            current_label=current_label,
+            comparison_label=comparison_label,
+        )
     statistics_interpretation = _build_statistics_interpretation(
         database,
         statistics_panel,
@@ -1481,15 +1687,28 @@ def database_detail(request, slug):
         "statistics_auto_summary": statistics_auto_summary,
         "operational_statistics": operational_statistics,
         "statistics_field_options": statistics_field_options,
+        "stats_chart_options_map": stats_chart_options_map,
         "selected_stats_field": selected_stats_field,
         "stats_chart_type": statistics_panel.get("chart_type", SavedStatistic.ChartType.AUTO),
         "stats_query": stats_query,
         "stats_priority": stats_priority,
         "stats_date_from": stats_date_from,
         "stats_date_to": stats_date_to,
+        "compare_mode": compare_mode,
+        "compare_date_from": compare_date_from,
+        "compare_date_to": compare_date_to,
+        "analysis_requested": analysis_requested,
+        "comparison_requested": bool(compare_mode) and analysis_requested,
+        "compare_mode_options": [
+            ("", "Sin comparacion"),
+            ("last_7", "Ultimos 7 dias previos"),
+            ("last_30", "Ultimos 30 dias previos"),
+            ("manual", "Comparacion manual"),
+        ],
         "stats_has_advanced_filters": any([stats_query, stats_priority, stats_date_from, stats_date_to]),
         "stats_filtered_count": len(filtered_stats_records),
         "stats_chart_type_options": statistics_panel.get("chart_type_options", []),
+        "comparison_summary": comparison_summary,
         "saved_statistics": saved_statistics,
         "selected_saved_statistic": saved_statistic,
         "saved_statistic_form": SavedStatisticForm(),
