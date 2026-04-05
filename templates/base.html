@@ -128,15 +128,25 @@
                     return;
                 }
 
+                const persistScrollPosition = () => {
+                    sessionStorage.setItem(
+                        STORAGE_KEY,
+                        JSON.stringify({
+                            y: window.scrollY,
+                            timestamp: Date.now(),
+                        }),
+                    );
+                };
+
                 document.querySelectorAll("form").forEach((form) => {
                     form.addEventListener("submit", () => {
-                        sessionStorage.setItem(
-                            STORAGE_KEY,
-                            JSON.stringify({
-                                y: window.scrollY,
-                                timestamp: Date.now(),
-                            }),
-                        );
+                        persistScrollPosition();
+                    });
+                });
+
+                document.querySelectorAll("a.table-sort-link").forEach((link) => {
+                    link.addEventListener("click", () => {
+                        persistScrollPosition();
                     });
                 });
             };

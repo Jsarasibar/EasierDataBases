@@ -169,6 +169,14 @@ class Record(models.Model):
         blank=True,
         related_name="updated_records",
     )
+    archived_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="archived_records",
+    )
+    archived_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -177,6 +185,10 @@ class Record(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def is_archived(self):
+        return self.archived_at is not None
 
     def get_value(self, field):
         return self.data.get(field.key, "")

@@ -7,19 +7,46 @@
 <section class="panel narrow">
     <div class="panel-head">
         <span class="eyebrow">{{ database.name }}</span>
-        <h1>Mapear columnas del archivo</h1>
-        <p>Relaciona cada columna del CSV con el dato correcto antes de importar las {{ total_rows }} filas detectadas.</p>
+        <h1>Paso 2: revisar y mapear columnas</h1>
+        <p>Confirma que el archivo es correcto y relaciona cada columna del CSV con el dato correspondiente antes de importar las {{ total_rows }} filas detectadas.</p>
+    </div>
+    <div class="import-flow-intro import-flow-intro-compact">
+        <div class="import-flow-step is-complete">
+            <span class="import-flow-number">1</span>
+            <div>
+                <strong>Archivo subido</strong>
+                <p>{{ original_filename }}</p>
+            </div>
+        </div>
+        <div class="import-flow-step is-active">
+            <span class="import-flow-number">2</span>
+            <div>
+                <strong>Mapear e importar</strong>
+                <p>{{ total_rows }} filas detectadas{% if has_header %} con encabezados{% endif %}.</p>
+            </div>
+        </div>
+    </div>
+    <div class="record-meta import-detected-meta">
+        <div class="record-meta-row"><span>Archivo</span><strong>{{ original_filename }}</strong></div>
+        <div class="record-meta-row"><span>Filas detectadas</span><strong>{{ total_rows }}</strong></div>
+        <div class="record-meta-row"><span>Columnas</span><strong>{{ headers|length }}</strong></div>
     </div>
     <form method="post" class="stack-form">
         {% csrf_token %}
+        <div class="import-upload-note">
+            Asigna cada columna del archivo a un campo de la base. Si una columna no te sirve, puedes dejarla en <strong>Ignorar</strong>.
+        </div>
         {% for field in form %}
             <label class="field">
-                <span>{{ field.label }}</span>
+                <span>Columna: {{ field.label }}</span>
                 {{ field }}
                 {{ field.errors }}
             </label>
         {% endfor %}
-        <button type="submit" class="button">Importar con este mapeo</button>
+        <div class="hero-actions">
+            <a class="button subtle" href="{% url 'database_detail' database.slug %}?tab=manage">Elegir otro archivo</a>
+            <button type="submit" class="button">Importar con este mapeo</button>
+        </div>
     </form>
 </section>
 

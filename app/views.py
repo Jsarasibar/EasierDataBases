@@ -12,9 +12,9 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db.models import Q, TextField
+from django.db.models import Max, Q, TextField
 from django.db.models.functions import Cast
-from django.http import Http404, HttpResponse, HttpResponseForbidden
+from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -584,7 +584,7 @@ def _build_statistics_interpretation(database, statistics_panel, filtered_record
 
 
 def _build_statistics_auto_summary(database, filtered_records, statistics_panel, history_stats):
-    total_records = database.records.count()
+    total_records = _records_queryset(database).count()
     relation_fields = database.fields.filter(field_type=CustomField.FieldType.RELATION)
     filled_relation_count = 0
     for record in filtered_records:
@@ -613,8 +613,8 @@ def _build_statistics_auto_summary(database, filtered_records, statistics_panel,
         insights.append("La base ya esta lista para analizar distribuciones, fechas o campos numericos cuando tengas mas datos.")
 
     if database.has_priority:
-        urgent = database.records.filter(priority=Record.Priority.URGENT).count()
-        high = database.records.filter(priority=Record.Priority.HIGH).count()
+        urgent = _records_queryset(database).filter(priority=Record.Priority.URGENT).count()
+        high = _records_queryset(database).filter(priority=Record.Priority.HIGH).count()
         insights.append(f"En prioridades, hay {urgent} urgentes y {high} altas para seguir de cerca.")
     else:
         insights.append(f"{filled_relation_count} registros ya usan al menos una relacion cargada dentro de la base.")
@@ -623,11 +623,11 @@ def _build_statistics_auto_summary(database, filtered_records, statistics_panel,
 
 
 def _build_operational_statistics(database):
-    records = list(database.records.all())
+    records = list(_records_queryset(database))
     relation_fields = list(database.fields.filter(field_type=CustomField.FieldType.RELATION))
     date_fields = list(database.fields.filter(field_type=CustomField.FieldType.DATE))
     select_fields = list(database.fields.filter(field_type=CustomField.FieldType.SELECT))
-    created_recently = database.records.filter(created_at__date__gte=(timezone.localdate() - timedelta(days=7))).count()
+    created_recently = _records_queryset(database).filter(created_at__date__gte=(timezone.localdate() - timedelta(days=7))).count()
 
     relation_missing = 0
     if relation_fields:
@@ -680,7 +680,7 @@ def _build_operational_statistics(database):
             0,
             {
                 "label": "Prioridad urgente",
-                "value": str(database.records.filter(priority=Record.Priority.URGENT).count()),
+                "value": str(_records_queryset(database).filter(priority=Record.Priority.URGENT).count()),
                 "detail": "Elementos que requieren atencion inmediata.",
             },
         )
@@ -710,7 +710,7 @@ def _filter_statistics_queryset(queryset, *, query="", priority="", date_from=No
 
 
 def _build_statistics_panel(database, selected_field_key, *, records=None, chart_type="auto"):
-    records = list(records if records is not None else database.records.all())
+    records = list(records if records is not None else _records_queryset(database))
     fields_by_key = {field.key: field for field in database.fields.all()}
 
     if selected_field_key == "__priority__" and database.has_priority:
@@ -1188,6 +1188,276 @@ def _filter_records_queryset(records, *, query="", record_id="", priority="", ha
     return records
 
 
+def _records_queryset(database, *, include_archived=False):
+    queryset = database.records.all()
+    if not include_archived:
+        queryset = queryset.filter(archived_at__isnull=True)
+    return queryset
+
+
+def _field_supports_table_sort(field):
+    return field.field_type in {
+        CustomField.FieldType.TEXT,
+        CustomField.FieldType.NUMBER,
+        CustomField.FieldType.CURRENCY,
+        CustomField.FieldType.DATE,
+        CustomField.FieldType.BOOLEAN,
+        CustomField.FieldType.EMAIL,
+        CustomField.FieldType.PHONE,
+        CustomField.FieldType.SELECT,
+        CustomField.FieldType.RELATION,
+    }
+
+
+def _normalize_records_sort(sort_value, direction_value, database):
+    allowed_builtin = {"updated", "created", "title", "priority", "id"}
+    if sort_value not in allowed_builtin and not sort_value.startswith("field:"):
+        sort_value = "updated"
+    if sort_value == "priority" and not database.has_priority:
+        sort_value = "updated"
+    if sort_value.startswith("field:"):
+        field_key = sort_value.split(":", 1)[1]
+        field = database.fields.filter(key=field_key).first()
+        if not field or not _field_supports_table_sort(field):
+            sort_value = "updated"
+    if direction_value not in {"asc", "desc"}:
+        direction_value = "desc" if sort_value in {"updated", "created", "id"} else "asc"
+    return sort_value, direction_value
+
+
+def _record_sort_value(record, sort_value, database, primary_field, sort_field=None):
+    if sort_value == "id":
+        return record.pk
+    if sort_value == "title":
+        return (record.title or "").lower()
+    if sort_value == "created":
+        return record.created_at
+    if sort_value == "updated":
+        return record.updated_at
+    if sort_value == "priority":
+        priority_order = {
+            Record.Priority.NORMAL: 1,
+            Record.Priority.HIGH: 2,
+            Record.Priority.URGENT: 3,
+        }
+        return priority_order.get(record.priority, 0)
+    if sort_value.startswith("field:"):
+        field = sort_field
+        if not field:
+            return None
+        raw_value = record.data.get(field.key)
+        if raw_value in ("", None):
+            return None
+        if field.field_type in {CustomField.FieldType.NUMBER, CustomField.FieldType.CURRENCY}:
+            try:
+                return Decimal(str(raw_value))
+            except (InvalidOperation, TypeError):
+                return None
+        if field.field_type == CustomField.FieldType.DATE:
+            return parse_date(str(raw_value)) or str(raw_value)
+        if field.field_type == CustomField.FieldType.BOOLEAN:
+            return 1 if raw_value else 0
+        if field.field_type == CustomField.FieldType.RELATION:
+            related_record, _relation_error = _resolve_related_record(field, raw_value)
+            return (related_record.title if related_record else "").lower()
+        return str(raw_value).lower()
+    if primary_field:
+        return (record.title or "").lower()
+    return record.pk
+
+
+def _sort_records(records, *, database, sort_value, direction_value, primary_field=None):
+    sort_field = None
+    if sort_value.startswith("field:"):
+        field_key = sort_value.split(":", 1)[1]
+        sort_field = database.fields.filter(key=field_key).first()
+    sortable = []
+    empty = []
+    for record in list(records):
+        value = _record_sort_value(record, sort_value, database, primary_field, sort_field=sort_field)
+        if value in ("", None):
+            empty.append(record)
+        else:
+            sortable.append((value, record))
+    sortable.sort(key=lambda item: item[0], reverse=(direction_value == "desc"))
+    return [item[1] for item in sortable] + empty
+
+
+def _records_query_string(*, database, record_id="", query="", priority="", view_mode="table", sort_value="updated", direction_value="desc", page=None):
+    params = {
+        "tab": "records",
+        "record_id": record_id,
+        "q": query,
+        "priority": priority,
+        "view": view_mode,
+        "sort": sort_value,
+        "direction": direction_value,
+    }
+    if page:
+        params["page"] = page
+    cleaned = {key: value for key, value in params.items() if value not in ("", None)}
+    return f"{reverse('database_detail', args=[database.slug])}?{urlencode(cleaned)}"
+
+
+def _record_filter_definitions(database, user):
+    definitions = []
+    for field in database.fields.all():
+        if field.field_type == CustomField.FieldType.SELECT:
+            definitions.append(
+                {
+                    "kind": "select",
+                    "field": field,
+                    "name": f"field_{field.key}",
+                    "label": field.label,
+                    "options": [(option, option) for option in field.get_options()],
+                }
+            )
+        elif field.field_type == CustomField.FieldType.BOOLEAN:
+            definitions.append(
+                {
+                    "kind": "boolean",
+                    "field": field,
+                    "name": f"field_{field.key}",
+                    "label": field.label,
+                    "options": [("true", "Si"), ("false", "No")],
+                }
+            )
+        elif field.field_type == CustomField.FieldType.RELATION and field.relation_database and field.relation_database.memberships.filter(user=user).exists():
+            definitions.append(
+                {
+                    "kind": "relation",
+                    "field": field,
+                    "name": f"field_{field.key}",
+                    "label": field.label,
+                    "options": list(_records_queryset(field.relation_database).order_by("title", "pk").values_list("pk", "title")[:100]),
+                }
+            )
+        elif field.field_type in {CustomField.FieldType.NUMBER, CustomField.FieldType.CURRENCY}:
+            definitions.append(
+                {
+                    "kind": "range",
+                    "field": field,
+                    "label": field.label,
+                    "min_name": f"field_{field.key}_min",
+                    "max_name": f"field_{field.key}_max",
+                }
+            )
+        elif field.field_type == CustomField.FieldType.DATE:
+            definitions.append(
+                {
+                    "kind": "date_range",
+                    "field": field,
+                    "label": field.label,
+                    "from_name": f"field_{field.key}_from",
+                    "to_name": f"field_{field.key}_to",
+                }
+            )
+    return definitions
+
+
+def _extract_record_filter_values(request, definitions):
+    values = {}
+    for definition in definitions:
+        if definition["kind"] in {"select", "boolean", "relation"}:
+            value = request.GET.get(definition["name"], "").strip()
+            if value:
+                values[definition["name"]] = value
+        elif definition["kind"] == "range":
+            min_value = request.GET.get(definition["min_name"], "").strip()
+            max_value = request.GET.get(definition["max_name"], "").strip()
+            if min_value:
+                values[definition["min_name"]] = min_value
+            if max_value:
+                values[definition["max_name"]] = max_value
+        elif definition["kind"] == "date_range":
+            from_value = request.GET.get(definition["from_name"], "").strip()
+            to_value = request.GET.get(definition["to_name"], "").strip()
+            if from_value:
+                values[definition["from_name"]] = from_value
+            if to_value:
+                values[definition["to_name"]] = to_value
+    return values
+
+
+def _apply_record_filter_values(records, definitions, values):
+    records = list(records)
+    for definition in definitions:
+        field = definition["field"]
+        if definition["kind"] == "select":
+            selected = values.get(definition["name"])
+            if selected:
+                records = [record for record in records if str(record.data.get(field.key, "")) == selected]
+        elif definition["kind"] == "boolean":
+            selected = values.get(definition["name"])
+            if selected == "true":
+                records = [record for record in records if record.data.get(field.key) is True]
+            elif selected == "false":
+                records = [record for record in records if record.data.get(field.key) is False]
+        elif definition["kind"] == "relation":
+            selected = values.get(definition["name"])
+            if selected:
+                records = [record for record in records if str(record.data.get(field.key, "")) == str(selected)]
+        elif definition["kind"] == "range":
+            min_value = values.get(definition["min_name"])
+            max_value = values.get(definition["max_name"])
+            if min_value:
+                records = [record for record in records if _safe_decimal(record.data.get(field.key)) is not None and _safe_decimal(record.data.get(field.key)) >= _safe_decimal(min_value)]
+            if max_value:
+                records = [record for record in records if _safe_decimal(record.data.get(field.key)) is not None and _safe_decimal(record.data.get(field.key)) <= _safe_decimal(max_value)]
+        elif definition["kind"] == "date_range":
+            from_value = parse_date(values.get(definition["from_name"], ""))
+            to_value = parse_date(values.get(definition["to_name"], ""))
+            if from_value:
+                records = [record for record in records if parse_date(str(record.data.get(field.key) or "")) and parse_date(str(record.data.get(field.key))) >= from_value]
+            if to_value:
+                records = [record for record in records if parse_date(str(record.data.get(field.key) or "")) and parse_date(str(record.data.get(field.key))) <= to_value]
+    return records
+
+
+def _records_url_query(*, record_id="", query="", priority="", archived=False, view_mode="table", sort_value="updated", direction_value="desc", dynamic_filters=None, page=None):
+    params = [
+        ("tab", "records"),
+        ("record_id", record_id),
+        ("q", query),
+        ("priority", priority),
+        ("archived", "1" if archived else ""),
+        ("view", view_mode),
+        ("sort", sort_value),
+        ("direction", direction_value),
+    ]
+    for key, value in (dynamic_filters or {}).items():
+        if value not in ("", None):
+            params.append((key, value))
+    if page not in ("", None):
+        params.append(("page", page))
+    return urlencode([(key, value) for key, value in params if value not in ("", None)])
+
+
+def _dynamic_filter_values_from_mapping(mapping):
+    return {
+        key: str(value).strip()
+        for key, value in mapping.items()
+        if key.startswith("field_") and str(value).strip()
+    }
+
+
+def _swap_field_position(database, field, direction):
+    ordered_fields = list(database.fields.order_by("position", "id"))
+    current_index = next((index for index, item in enumerate(ordered_fields) if item.pk == field.pk), None)
+    if current_index is None:
+        return False
+    target_index = current_index - 1 if direction == "up" else current_index + 1
+    if target_index < 0 or target_index >= len(ordered_fields):
+        return False
+    target_field = ordered_fields[target_index]
+    current_position = field.position
+    field.position = target_field.position
+    target_field.position = current_position
+    field.save(update_fields=["position"])
+    target_field.save(update_fields=["position"])
+    return True
+
+
 def _load_demo_records(database, user, template_key):
     primary_field = database.get_primary_field()
     available_field_keys = {field.key for field in database.fields.all()}
@@ -1419,26 +1689,27 @@ def database_detail(request, slug):
     saved_view_id = request.GET.get("saved_view")
     q = request.GET.get("q", "").strip()
     record_id = request.GET.get("record_id", "").strip()
+    if record_id and not q:
+        q = record_id
     priority = request.GET.get("priority", "").strip()
+    record_filter_definitions = _record_filter_definitions(database, request.user)
+    record_filter_values = _extract_record_filter_values(request, record_filter_definitions)
+    archived_mode = request.GET.get("archived", "").strip() == "1"
     view_mode = request.GET.get("view", "table")
     if view_mode not in {"table", "cards"}:
         view_mode = "table"
-    sort = request.GET.get("sort", "updated")
-    sort_map = {
-        "updated": "-updated_at",
-        "title": "title",
-        "created": "-created_at",
-    }
-    if database.has_priority:
-        sort_map["priority"] = "priority"
+    sort = request.GET.get("sort", "updated").strip() or "updated"
+    sort_direction = request.GET.get("direction", "").strip()
+    sort, sort_direction = _normalize_records_sort(sort, sort_direction, database)
 
     records = _filter_records_queryset(
-        database.records.all().annotate(data_text=Cast("data", output_field=TextField())),
+        _records_queryset(database, include_archived=archived_mode).annotate(data_text=Cast("data", output_field=TextField())),
         query=q,
         record_id=record_id,
         priority=priority,
         has_priority=database.has_priority,
     )
+    records = _apply_record_filter_values(records, record_filter_definitions, record_filter_values)
     if saved_view_id:
         saved_view = database.saved_views.filter(user=request.user, pk=saved_view_id).first()
         if saved_view:
@@ -1447,19 +1718,30 @@ def database_detail(request, slug):
             sort = saved_view.sort
             view_mode = saved_view.view_mode
             records = _filter_records_queryset(
-                database.records.all().annotate(data_text=Cast("data", output_field=TextField())),
+                _records_queryset(database, include_archived=archived_mode).annotate(data_text=Cast("data", output_field=TextField())),
                 query=q,
                 record_id=record_id,
                 priority=priority,
                 has_priority=database.has_priority,
             )
-    records = records.order_by(sort_map.get(sort, "-updated_at"))
+            records = _apply_record_filter_values(records, record_filter_definitions, record_filter_values)
+    records = _sort_records(
+        records,
+        database=database,
+        sort_value=sort,
+        direction_value=sort_direction,
+        primary_field=primary_field,
+    )
     paginator = Paginator(records, 20)
     page_obj = paginator.get_page(request.GET.get("page") or 1)
 
-    total_records = database.records.count()
-    high_priority_count = database.records.filter(priority=Record.Priority.HIGH).count() if database.has_priority else 0
-    urgent_count = database.records.filter(priority=Record.Priority.URGENT).count() if database.has_priority else 0
+    active_records_queryset = _records_queryset(database)
+    archived_records_queryset = _records_queryset(database, include_archived=True).filter(archived_at__isnull=False)
+    total_records = active_records_queryset.count()
+    archived_records_count = archived_records_queryset.count()
+    archived_records_manage = archived_records_queryset.order_by("-archived_at", "-updated_at", "-id")
+    high_priority_count = active_records_queryset.filter(priority=Record.Priority.HIGH).count() if database.has_priority else 0
+    urgent_count = active_records_queryset.filter(priority=Record.Priority.URGENT).count() if database.has_priority else 0
     relation_fields = database.fields.filter(field_type=CustomField.FieldType.RELATION).select_related("relation_database")
     select_fields = database.fields.filter(field_type=CustomField.FieldType.SELECT)
     relation_previews = {}
@@ -1480,18 +1762,21 @@ def database_detail(request, slug):
                     "edit_url": "",
                     "fields": [{"label": "Estado", "value": relation_error}],
                 }
+    ordered_fields = list(database.fields.all())
     field_cards = [
         {
             "field": field,
             "form": CustomFieldForm(database=database, actor=request.user, instance=field),
             "has_data": _field_has_data(field),
+            "is_first": index == 0,
+            "is_last": index == len(ordered_fields) - 1,
         }
-        for field in database.fields.all()
+        for index, field in enumerate(ordered_fields)
     ]
     daily_records = (
-        database.records.exclude(priority=Record.Priority.NORMAL)[:8]
+        active_records_queryset.exclude(priority=Record.Priority.NORMAL)[:8]
         if database.has_priority
-        else database.records.all()[:8]
+        else active_records_queryset[:8]
     )
     import_summary = request.session.pop(_import_session_key(database) + "_summary", None)
     history_page = Paginator(database.activities.select_related("actor"), 25).get_page(request.GET.get("history_page") or 1)
@@ -1527,7 +1812,7 @@ def database_detail(request, slug):
     parsed_stats_date_from = parse_date(stats_date_from) if stats_date_from else None
     parsed_stats_date_to = parse_date(stats_date_to) if stats_date_to else None
     stats_queryset = _filter_statistics_queryset(
-        database.records.all().annotate(data_text=Cast("data", output_field=TextField())),
+        active_records_queryset.annotate(data_text=Cast("data", output_field=TextField())),
         query=stats_query,
         priority=stats_priority,
         date_from=parsed_stats_date_from,
@@ -1552,7 +1837,7 @@ def database_detail(request, slug):
     comparison_summary = None
     if comparison_from or comparison_to:
         comparison_queryset = _filter_statistics_queryset(
-            database.records.all().annotate(data_text=Cast("data", output_field=TextField())),
+            active_records_queryset.annotate(data_text=Cast("data", output_field=TextField())),
             query=stats_query,
             priority=stats_priority,
             date_from=comparison_from,
@@ -1647,14 +1932,17 @@ def database_detail(request, slug):
         "has_priority": database.has_priority,
         "membership": membership,
         "active_tab": active_tab,
-        "table_fields": database.fields.filter(show_in_table=True),
-        "all_fields": database.fields.all(),
+        "table_fields": [field for field in ordered_fields if field.show_in_table],
+        "all_fields": ordered_fields,
         "field_cards": field_cards,
         "relation_fields": relation_fields,
         "relation_previews": relation_previews,
         "select_fields": select_fields,
         "records": page_obj.object_list,
         "page_obj": page_obj,
+        "archived_mode": archived_mode,
+        "archived_records_count": archived_records_count,
+        "archived_records_manage": archived_records_manage,
         "daily_records": daily_records,
         "query": q,
         "selected_record_id": record_id,
@@ -1662,6 +1950,29 @@ def database_detail(request, slug):
         "priority_choices": Record.Priority.choices if database.has_priority else [],
         "view_mode": view_mode,
         "sort": sort,
+        "sort_direction": sort_direction,
+        "records_table_base_url": _records_query_string(
+            database=database,
+            record_id=record_id,
+            query=q,
+            priority=priority,
+            view_mode=view_mode,
+            sort_value=sort,
+            direction_value=sort_direction,
+        ),
+        "records_query_base": _records_url_query(
+            record_id=record_id,
+            query=q,
+            priority=priority,
+            archived=archived_mode,
+            view_mode=view_mode,
+            sort_value=sort,
+            direction_value=sort_direction,
+            dynamic_filters=record_filter_values,
+        ),
+        "record_filter_definitions": record_filter_definitions,
+        "record_filter_values": record_filter_values,
+        "record_filters_active": bool(record_filter_values),
         "sort_choices": [
             ("updated", "Actualizados recientemente"),
             ("created", "Mas nuevos"),
@@ -1973,6 +2284,91 @@ def field_set_primary(request, slug, field_id):
 
 
 @login_required
+def field_move(request, slug, field_id, direction):
+    database, membership = _get_database_for_user(request.user, slug)
+    if membership.role != DatabaseMembership.Role.ADMIN:
+        return HttpResponseForbidden("Solo los administradores pueden reordenar campos.")
+
+    if direction not in {"up", "down"}:
+        raise Http404()
+
+    custom_field = get_object_or_404(database.fields, pk=field_id)
+    if request.method == "POST":
+        moved = _swap_field_position(database, custom_field, direction)
+        if moved:
+            _log_database_activity(
+                database,
+                request.user,
+                "Campo reordenado",
+                f"Se movio el campo {custom_field.label} {'hacia arriba' if direction == 'up' else 'hacia abajo'}.",
+                payload={
+                    "summary": [
+                        {"label": "Campo", "value": custom_field.label},
+                        {"label": "Direccion", "value": "Arriba" if direction == "up" else "Abajo"},
+                    ]
+                },
+            )
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "moved": True,
+                        "field_id": custom_field.pk,
+                        "direction": direction,
+                        "ordered_ids": list(database.fields.order_by("position", "id").values_list("id", flat=True)),
+                    }
+                )
+        else:
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse(
+                    {
+                        "ok": True,
+                        "moved": False,
+                        "field_id": custom_field.pk,
+                        "direction": direction,
+                    }
+                )
+            messages.info(request, "Ese campo ya esta en el extremo y no puede moverse mas.")
+    return redirect(_database_tab_url(database, "structure"))
+
+
+@login_required
+def field_duplicate(request, slug, field_id):
+    database, membership = _get_database_for_user(request.user, slug)
+    if membership.role != DatabaseMembership.Role.ADMIN:
+        return HttpResponseForbidden("Solo los administradores pueden duplicar campos.")
+
+    custom_field = get_object_or_404(database.fields, pk=field_id)
+    if request.method == "POST":
+        max_position = database.fields.aggregate(Max("position"))["position__max"] or 0
+        duplicated = CustomField.objects.create(
+            database=database,
+            label=f"{custom_field.label} (copia)",
+            field_type=custom_field.field_type,
+            help_text=custom_field.help_text,
+            options_text=custom_field.options_text,
+            relation_database=custom_field.relation_database,
+            required=custom_field.required,
+            show_in_table=custom_field.show_in_table,
+            position=max_position + 1,
+        )
+        _log_database_activity(
+            database,
+            request.user,
+            "Campo duplicado",
+            f"Se duplico el campo {custom_field.label}.",
+            payload={
+                "summary": [
+                    {"label": "Campo original", "value": custom_field.label},
+                    {"label": "Nuevo campo", "value": duplicated.label},
+                ]
+            },
+        )
+        messages.success(request, f"Se duplico el campo {custom_field.label}.")
+    return redirect(_database_tab_url(database, "structure"))
+
+
+@login_required
 def field_delete(request, slug, field_id):
     database, membership = _get_database_for_user(request.user, slug)
     if membership.role != DatabaseMembership.Role.ADMIN:
@@ -2032,6 +2428,30 @@ def member_create(request, slug):
 
 
 @login_required
+def relation_record_search(request, slug, field_id):
+    database, membership = _get_database_for_user(request.user, slug)
+    field = get_object_or_404(
+        database.fields.select_related("relation_database"),
+        pk=field_id,
+        field_type=CustomField.FieldType.RELATION,
+    )
+    if not field.relation_database or not field.relation_database.memberships.filter(user=request.user).exists():
+        return JsonResponse({"results": []})
+
+    query = request.GET.get("q", "").strip()
+    records = _records_queryset(field.relation_database)
+    if query:
+        records = records.annotate(data_text=Cast("data", output_field=TextField()))
+        id_query = Q(pk=int(query)) if query.isdigit() else Q()
+        records = records.filter(id_query | Q(title__icontains=query) | Q(data_text__icontains=query))
+    results = [
+        {"id": record.pk, "label": f"#{record.pk} - {record.title}"}
+        for record in records.order_by("title", "pk")[:12]
+    ]
+    return JsonResponse({"results": results})
+
+
+@login_required
 @xframe_options_exempt
 def record_create(request, slug):
     database, membership = _get_database_for_user(request.user, slug)
@@ -2064,14 +2484,116 @@ def record_create(request, slug):
     return render(
         request,
         "record_form.html",
-        {"form": form, "database": database, "mode": "create"},
+        {
+            "form": form,
+            "database": database,
+            "mode": "create",
+            "relation_search_fields": [
+                field.key for field in database.fields.filter(field_type=CustomField.FieldType.RELATION)
+            ],
+        },
+    )
+
+
+@login_required
+def record_duplicate(request, slug, pk):
+    database, membership = _get_database_for_user(request.user, slug)
+    record = get_object_or_404(_records_queryset(database), pk=pk)
+    if request.method != "POST":
+        return redirect(_database_tab_url(database, "records"))
+
+    duplicated_data = dict(record.data or {})
+    duplicated_record = Record(
+        database=database,
+        title=record.title,
+        priority=record.priority if database.has_priority else Record.Priority.NORMAL,
+        data=duplicated_data,
+        created_by=request.user,
+        updated_by=request.user,
+    )
+    primary_field = database.get_primary_field()
+    if primary_field and primary_field.key in duplicated_data:
+        primary_value = duplicated_data.get(primary_field.key)
+        if isinstance(primary_value, str) and primary_value.strip():
+            duplicated_data[primary_field.key] = f"Copia de {primary_value}"
+            duplicated_record.title = f"Copia de {record.title}"
+    duplicated_record.save()
+    _log_database_activity(
+        database,
+        request.user,
+        "Registro duplicado",
+        f"Se duplico el registro {record.title} como {duplicated_record.title}.",
+        payload={
+            "summary": [
+                {"label": "Original", "value": record.title},
+                {"label": "Nuevo", "value": duplicated_record.title},
+                {"label": "Nuevo ID", "value": str(duplicated_record.pk)},
+            ]
+        },
+    )
+    messages.success(request, f"Se creo una copia de {record.title}.")
+    return redirect(
+        f"{reverse('database_detail', args=[database.slug])}?"
+        f"{_records_url_query(
+            record_id=request.POST.get('record_id', request.GET.get('record_id', '')).strip(),
+            query=request.POST.get('q', request.GET.get('q', '')).strip(),
+            priority=request.POST.get('priority', request.GET.get('priority', '')).strip(),
+            archived=request.POST.get('archived', request.GET.get('archived', '')).strip() == "1",
+            view_mode=request.POST.get('view', request.GET.get('view', 'table')),
+            sort_value=request.POST.get('sort', request.GET.get('sort', 'updated')),
+            direction_value=request.POST.get('direction', request.GET.get('direction', 'desc')),
+            dynamic_filters=_dynamic_filter_values_from_mapping(request.POST),
+        )}"
+    )
+
+
+@login_required
+def record_priority_update(request, slug, pk):
+    database, membership = _get_database_for_user(request.user, slug)
+    if not database.has_priority:
+        return redirect(_database_tab_url(database, "records"))
+    record = get_object_or_404(_records_queryset(database), pk=pk)
+    if request.method == "POST":
+        new_priority = request.POST.get("priority", "").strip()
+        valid_priorities = {choice[0] for choice in Record.Priority.choices}
+        if new_priority in valid_priorities and new_priority != record.priority:
+            previous_priority = record.get_priority_display()
+            record.priority = new_priority
+            record.updated_by = request.user
+            record.save(update_fields=["priority", "updated_by", "updated_at"])
+            _log_database_activity(
+                database,
+                request.user,
+                "Prioridad actualizada",
+                f"Se cambio la prioridad de {record.title}.",
+                payload={
+                    "summary": [
+                        {"label": "Registro", "value": record.title},
+                        {"label": "Antes", "value": previous_priority},
+                        {"label": "Ahora", "value": record.get_priority_display()},
+                    ]
+                },
+            )
+            messages.success(request, f"La prioridad de {record.title} fue actualizada.")
+    return redirect(
+        f"{reverse('database_detail', args=[database.slug])}?"
+        f"{_records_url_query(
+            record_id=request.POST.get('record_id', '').strip(),
+            query=request.POST.get('q', '').strip(),
+            priority=request.POST.get('priority_filter', '').strip(),
+            archived=request.POST.get('archived', '').strip() == "1",
+            view_mode=request.POST.get('view', 'table'),
+            sort_value=request.POST.get('sort', 'updated'),
+            direction_value=request.POST.get('direction', 'desc'),
+            dynamic_filters=_dynamic_filter_values_from_mapping(request.POST),
+        )}"
     )
 
 
 @login_required
 def record_detail(request, slug, pk):
     database, membership = _get_database_for_user(request.user, slug)
-    record = get_object_or_404(database.records, pk=pk)
+    record = get_object_or_404(_records_queryset(database), pk=pk)
     accessible_databases = _accessible_databases_for_user(request.user)
     accessible_database_ids = set(accessible_databases.values_list("pk", flat=True))
 
@@ -2102,7 +2624,7 @@ def record_detail(request, slug, pk):
         .order_by("database__name", "label")
     )
     for relation_field in relation_fields:
-        linked_records = relation_field.database.records.filter(**{f"data__{relation_field.key}": str(record.pk)})
+        linked_records = _records_queryset(relation_field.database).filter(**{f"data__{relation_field.key}": str(record.pk)})
         if linked_records.exists():
             incoming_relations.append(
                 {
@@ -2129,7 +2651,7 @@ def record_detail(request, slug, pk):
 @login_required
 def record_edit(request, slug, pk):
     database, membership = _get_database_for_user(request.user, slug)
-    record = get_object_or_404(database.records, pk=pk)
+    record = get_object_or_404(_records_queryset(database), pk=pk)
     previous_title = record.title
     previous_data = dict(record.data or {})
     previous_priority = record.priority
@@ -2165,14 +2687,64 @@ def record_edit(request, slug, pk):
     return render(
         request,
         "record_form.html",
-        {"form": form, "database": database, "record": record, "mode": "edit"},
+        {
+            "form": form,
+            "database": database,
+            "record": record,
+            "mode": "edit",
+            "relation_search_fields": [
+                field.key for field in database.fields.filter(field_type=CustomField.FieldType.RELATION)
+            ],
+        },
     )
+
+
+@login_required
+def record_archive(request, slug, pk):
+    database, membership = _get_database_for_user(request.user, slug)
+    record = get_object_or_404(_records_queryset(database), pk=pk)
+    if request.method == "POST":
+        record_title = record.title
+        record.archived_at = timezone.now()
+        record.archived_by = request.user
+        record.updated_by = request.user
+        record.save(update_fields=["archived_at", "archived_by", "updated_by", "updated_at"])
+        _log_database_activity(
+            database,
+            request.user,
+            "Registro archivado",
+            f"Se archivo el registro {record_title}.",
+            payload={"summary": [{"label": "Registro archivado", "value": record_title}]},
+        )
+        messages.success(request, "Registro archivado.")
+    return redirect(_database_tab_url(database, "records"))
+
+
+@login_required
+def record_restore(request, slug, pk):
+    database, membership = _get_database_for_user(request.user, slug)
+    record = get_object_or_404(_records_queryset(database, include_archived=True).filter(archived_at__isnull=False), pk=pk)
+    if request.method == "POST":
+        record.archived_at = None
+        record.archived_by = None
+        record.updated_by = request.user
+        record.save(update_fields=["archived_at", "archived_by", "updated_by", "updated_at"])
+        _log_database_activity(
+            database,
+            request.user,
+            "Registro restaurado",
+            f"Se restauro el registro {record.title}.",
+            payload={"summary": [{"label": "Registro restaurado", "value": record.title}]},
+        )
+        messages.success(request, f"{record.title} volvio a la base activa.")
+    next_url = request.POST.get("next", "").strip()
+    return redirect(next_url or f"{reverse('database_detail', args=[database.slug])}?tab=records&archived=1")
 
 
 @login_required
 def record_delete(request, slug, pk):
     database, membership = _get_database_for_user(request.user, slug)
-    record = get_object_or_404(database.records, pk=pk)
+    record = get_object_or_404(_records_queryset(database, include_archived=True), pk=pk)
     if request.method == "POST":
         record_title = record.title
         record.delete()
@@ -2180,16 +2752,66 @@ def record_delete(request, slug, pk):
             database,
             request.user,
             "Registro eliminado",
-            f"Se elimino el registro {record_title}.",
+            f"Se elimino definitivamente el registro {record_title}.",
             payload={"summary": [{"label": "Registro eliminado", "value": record_title}]},
         )
-        messages.success(request, "Registro eliminado.")
-        return redirect("database_detail", slug=database.slug)
+        messages.success(request, "Registro eliminado definitivamente.")
+        next_url = request.POST.get("next", "").strip()
+        return redirect(next_url or _database_tab_url(database, "records"))
     return render(
         request,
         "record_confirm_delete.html",
         {"database": database, "record": record},
     )
+
+
+@login_required
+def records_restore_all(request, slug):
+    database, membership = _get_database_for_user(request.user, slug)
+    archived_records = list(_records_queryset(database, include_archived=True).filter(archived_at__isnull=False))
+    if request.method == "POST" and archived_records:
+        restored_count = len(archived_records)
+        for record in archived_records:
+            record.archived_at = None
+            record.archived_by = None
+            record.updated_by = request.user
+            record.save(update_fields=["archived_at", "archived_by", "updated_by", "updated_at"])
+        _log_database_activity(
+            database,
+            request.user,
+            "Archivados restaurados",
+            f"Se restauraron {restored_count} registros archivados.",
+            payload={"summary": [{"label": "Registros restaurados", "value": str(restored_count)}]},
+        )
+        messages.success(request, f"Se restauraron {restored_count} registros archivados.")
+    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=manage")
+
+
+@login_required
+def records_delete_all(request, slug):
+    database, membership = _get_database_for_user(request.user, slug)
+    if membership.role != DatabaseMembership.Role.ADMIN:
+        return HttpResponseForbidden("Solo los administradores pueden eliminar definitivamente registros archivados.")
+    archived_records = list(_records_queryset(database, include_archived=True).filter(archived_at__isnull=False))
+    if request.method == "POST" and archived_records:
+        deleted_count = len(archived_records)
+        archived_titles = [record.title for record in archived_records[:5]]
+        for record in archived_records:
+            record.delete()
+        _log_database_activity(
+            database,
+            request.user,
+            "Archivados eliminados",
+            f"Se eliminaron definitivamente {deleted_count} registros archivados.",
+            payload={
+                "summary": [
+                    {"label": "Registros eliminados", "value": str(deleted_count)},
+                    {"label": "Primeros registros", "value": ", ".join(archived_titles) if archived_titles else "-"},
+                ]
+            },
+        )
+        messages.success(request, f"Se eliminaron definitivamente {deleted_count} registros archivados.")
+    return redirect(f"{reverse('database_detail', args=[database.slug])}?tab=manage")
 
 
 @login_required
@@ -2223,6 +2845,7 @@ def records_import_start(request, slug):
         "preview_rows": inspection["preview_rows"],
         "total_rows": inspection["total_rows"],
         "file_path": temp_path,
+        "original_filename": form.cleaned_data["csv_file"].name,
         "has_header": form.cleaned_data["has_header"],
     }
     return redirect("records_import_map", slug=database.slug)
@@ -2242,6 +2865,7 @@ def records_import_map(request, slug):
     preview_rows = payload.get("preview_rows", [])
     total_rows = payload.get("total_rows", 0)
     file_path = payload.get("file_path")
+    original_filename = payload.get("original_filename", "archivo.csv")
     has_header = payload.get("has_header", True)
     form = CSVMappingForm(database, headers, request.POST or None)
 
@@ -2358,6 +2982,8 @@ def records_import_map(request, slug):
             "headers": headers,
             "preview_rows": preview_rows,
             "total_rows": total_rows,
+            "original_filename": original_filename,
+            "has_header": has_header,
         },
     )
 
@@ -2390,7 +3016,7 @@ def records_export(request, slug):
     if database.has_priority:
         headers.append("Prioridad")
     writer.writerow(headers)
-    for record in database.records.all():
+    for record in _records_queryset(database):
         row = []
         for field in fields:
             row.append(record.get_display_value(field))

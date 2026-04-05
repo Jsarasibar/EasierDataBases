@@ -15,6 +15,15 @@
         {% for field in form %}
             <label class="field">
                 <span>{{ field.label }}</span>
+                {% if field.name in relation_search_fields %}
+                    <input
+                        type="search"
+                        class="relation-search-input"
+                        data-relation-search-target="{{ field.id_for_label }}"
+                        placeholder="Buscar por ID o nombre..."
+                        autocomplete="off"
+                    >
+                {% endif %}
                 {{ field }}
                 {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
                 {{ field.errors }}
@@ -75,11 +84,77 @@
             }
             select.addEventListener("change", () => {
                 if (select.value !== sentinel) {
+                    const searchInput = document.querySelector(`[data-relation-search-target="${select.id}"]`);
+                    if (searchInput) {
+                        const selectedOption = select.options[select.selectedIndex];
+                        searchInput.value = selectedOption && selectedOption.value ? selectedOption.textContent : "";
+                    }
                     return;
                 }
                 select.value = "";
                 openModalForSelect(select);
             });
+        });
+
+        relationSelects.forEach((select) => {
+            const searchInput = document.querySelector(`[data-relation-search-target="${select.id}"]`);
+            if (!searchInput) {
+                return;
+            }
+            const placeholderOption = Array.from(select.options).find((option) => !option.value);
+            const createOption = Array.from(select.options).find((option) => option.value === sentinel);
+            const baseOptions = Array.from(select.options)
+                .filter((option) => option.value && option.value !== sentinel)
+                .map((option) => ({ value: option.value, text: option.textContent }));
+
+            const renderOptions = (query = "") => {
+                const normalized = query.trim().toLowerCase();
+                const localMatches = baseOptions.filter((option) => option.text.toLowerCase().includes(normalized));
+                select.innerHTML = "";
+                if (placeholderOption) {
+                    select.appendChild(new Option(placeholderOption.textContent, "", true, !select.value));
+                }
+                if (createOption) {
+                    select.appendChild(new Option(createOption.textContent, sentinel));
+                }
+                localMatches.forEach((option) => {
+                    const next = new Option(option.text, option.value);
+                    if (String(select.value) === String(option.value)) {
+                        next.selected = true;
+                    }
+                    select.appendChild(next);
+                });
+            };
+
+            searchInput.addEventListener("input", async () => {
+                const query = searchInput.value.trim();
+                renderOptions(query);
+                if (!query || !select.dataset.relationSearchUrl) {
+                    return;
+                }
+                try {
+                    const response = await fetch(`${select.dataset.relationSearchUrl}?q=${encodeURIComponent(query)}`);
+                    if (!response.ok) {
+                        return;
+                    }
+                    const payload = await response.json();
+                    const remoteResults = Array.isArray(payload.results) ? payload.results : [];
+                    const existingValues = new Set(Array.from(select.options).map((option) => option.value));
+                    remoteResults.forEach((item) => {
+                        if (existingValues.has(String(item.id))) {
+                            return;
+                        }
+                        select.appendChild(new Option(item.label, String(item.id)));
+                    });
+                } catch (error) {
+                    console.warn("No se pudo buscar la relacion.", error);
+                }
+            });
+
+            const initialOption = select.options[select.selectedIndex];
+            if (initialOption && initialOption.value) {
+                searchInput.value = initialOption.textContent;
+            }
         });
 
         closeButtons.forEach((button) => button.addEventListener("click", closeModal));

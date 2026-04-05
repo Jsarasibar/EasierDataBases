@@ -12,13 +12,6 @@ Cuando abras EasierDataBases vas a poder:
 - ingresar con una cuenta existente,
 - o recuperar tu contrasena si la olvidaste.
 
-Si es tu primera vez:
-
-1. Entra a la pantalla principal.
-2. Haz clic en `Crear cuenta`.
-3. Completa usuario, nombre, email y contrasena.
-4. Una vez dentro, llegaras al dashboard.
-
 ## 2. Entender el dashboard
 
 El dashboard es tu punto de partida.
@@ -30,14 +23,7 @@ Hoy muestra:
 - `Ideas para empezar`
 - `Actividad reciente`
 
-Desde ahi puedes:
-
-- crear una base nueva,
-- abrir una base existente,
-- retomar registros recientes,
-- o inspirarte con ejemplos de uso.
-
-`Tus bases` es la seccion principal del dashboard y el punto mas importante del producto: desde ahi abres cada base para trabajar de verdad.
+`Tus bases` es la seccion principal del dashboard y el punto mas importante del producto.
 
 ## 3. Crear una nueva base
 
@@ -46,79 +32,32 @@ Desde el dashboard:
 1. Haz clic en `Nueva base`.
 2. Se abrira el asistente de creacion.
 
-El asistente te guia en 4 pasos.
+El asistente te guia en 4 pasos:
 
-### Paso 1. Elegir una plantilla
+1. elegir plantilla
+2. ponerle nombre
+3. completar estructura inicial
+4. confirmar
 
-Aqui eliges con que estructura quieres empezar.
+En el paso 3 puedes:
 
-Opciones disponibles:
-
-- `Productos / Inventario`
-- `Alumnos / Cursos`
-- `Clientes / Contactos`
-- `Otra base`
-- `Desde cero`
-
-Cada plantilla ya trae campos base pensados para arrancar mas rapido.
-
-Ejemplos:
-
-- Productos: nombre, SKU, precio, stock, categoria.
-- Alumnos: nombre, curso, email, telefono.
-- Clientes: nombre, empresa, email, ultimo contacto.
-
-### Paso 2. Ponerle nombre
-
-En este paso defines:
-
-- el nombre de tu base,
-- y una descripcion breve de para que la usaras.
-
-Ejemplos:
-
-- `Catalogo de productos`
-- `Seguimiento de alumnos`
-- `Clientes activos`
-- `Pedidos internos`
-
-### Paso 3. Completarla
-
-Este paso es la configuracion inicial real de la base.
-
-Aqui veras:
-
-- los campos base de la plantilla,
-- campos extra recomendados,
-- la opcion de activar `Prioridad`,
-- y un bloque `+` para agregar campos propios.
-
-Todos los campos se muestran en una misma grilla de seleccion.
-
-Que puedes hacer aqui:
-
-- dejar activados los campos base,
-- marcar extras utiles,
-- agregar un campo nuevo con su tipo,
-- y decidir si quieres datos de ejemplo.
-
-### Paso 4. Confirmar
-
-Veras un resumen final de lo que se va a crear.
-
-Si todo esta bien:
-
-1. Revisa el nombre.
-2. Revisa los campos elegidos.
-3. Haz clic en confirmar.
-
-La base quedara creada y lista para usar.
+- activar o desactivar campos base,
+- sumar extras,
+- activar `Prioridad`,
+- y agregar campos propios.
 
 ## 4. Entender la pantalla de una base
 
-Cuando entras a una base, veras varias pestañas.
+Cuando entras a una base, veras estas pestanas:
 
-### Registros
+- `Registros`
+- `Trabajo diario`
+- `Estadisticas`
+- `Estructura`
+- `Gestion`
+- `Historial`
+
+## 5. Trabajar en `Registros`
 
 Es la vista principal y la que se abre por defecto.
 
@@ -127,117 +66,56 @@ Aqui puedes:
 - ver la tabla de datos,
 - cambiar a vista de tarjetas,
 - buscar por nombre, contenido o ID,
-- filtrar,
-- ordenar,
+- ordenar tocando el nombre de una columna,
+- aplicar filtros avanzados,
+- abrir el menu `...` de cada registro,
 - y agregar nuevos registros.
 
-La pantalla esta dividida en dos:
+### Ordenar por columnas
 
-- a la izquierda la tabla o tarjetas,
-- a la derecha los filtros y acciones.
+Toca el encabezado de una columna para ordenar.
 
-### Trabajo diario
+El orden cambia entre:
 
-Esta vista sirve para operar rapido.
+- ascendente
+- descendente
 
-Aqui ves:
+### Filtros avanzados
 
-- los elementos importantes del dia,
-- accesos rapidos para abrirlos,
-- y el boton de carga rapida.
+En el panel derecho puedes abrir `Filtros avanzados`.
 
-Es una pestaña pensada para el trabajo cotidiano, no para configurar estructura.
+Dependiendo de los campos de la base, podras filtrar por:
 
-### Resumen
+- seleccion,
+- si/no,
+- relacion,
+- rango numerico,
+- rango de fechas.
 
-Muestra una vista general de la base:
+### Menu `...` por registro
 
-- cuantos registros tiene,
-- cuantos campos hay,
-- cuantas relaciones existen,
-- y acciones recomendadas.
+Cada registro en tabla o tarjetas tiene un menu de acciones.
 
-Desde aqui tambien puedes entrar a `Graficos (estadisticas)`, que por ahora es una pantalla `Coming soon`.
+Desde ahi puedes:
 
-### Estructura
+- `Duplicar`
+- `Editar`
+- `Eliminar`
+- cambiar prioridad rapidamente si la base usa prioridad
 
-Esta pestaña sirve para diseñar la base.
-
-Aqui puedes:
-
-- ver todos los campos,
-- crear campos nuevos,
-- editar los existentes,
-- crear listas de opciones,
-- crear relaciones con otras bases,
-- y cambiar que columna se usa como nombre visible del registro.
-
-La parte superior muestra el bloque `Registro`, donde eliges que columna representa el nombre principal de cada registro.
-
-### Gestion
-
-Sirve para tareas de administracion.
-
-Aqui puedes:
-
-- importar datos desde CSV,
-- exportar la base,
-- asignar roles a otras personas,
-- y, si eres administrador, eliminar la base con confirmacion segura.
-
-### Historial
-
-Esta pestaña muestra la trazabilidad de la base.
-
-Aqui puedes ver:
-
-- que movimiento se hizo,
-- quien lo hizo,
-- cuando ocurrio,
-- y abrir una tarjeta con mas detalle.
-
-En cambios de registros, el detalle tambien puede mostrar comparacion `antes / ahora`.
-
-## 5. Crear registros manualmente
+## 6. Crear registros manualmente
 
 Para cargar informacion manualmente:
 
-1. Entra en la pestaña `Registros`.
-2. Haz clic en `Agregar registro` o `Nuevo registro`.
+1. Entra en `Registros`.
+2. Haz clic en `Agregar registro`.
 3. Completa los campos visibles.
 4. Si la base usa prioridad, elige la prioridad.
 5. Guarda el registro.
 
 Importante:
 
-- ya no existe un campo separado llamado `Nombre del registro`,
 - el nombre visible del registro sale del campo principal que definas en `Estructura`.
-
-Ejemplo en una base de productos:
-
-- Nombre: `Cafe molido`
-- Precio: `1500`
-- Stock: `12`
-- Categoria: `Bebidas`
-- Prioridad: `Urgente` si esa base tiene prioridad activada
-
-## 6. Buscar y filtrar informacion
-
-Para encontrar datos rapidamente:
-
-1. Ve a `Registros`.
-2. Usa la caja de busqueda.
-3. Si la base usa prioridad, filtra por prioridad.
-4. Si quieres, usa el filtro `ID exacto`.
-5. Elige el orden de visualizacion.
-
-Puedes usar esto para cosas como:
-
-- ver solo lo urgente,
-- encontrar un cliente por nombre,
-- localizar un registro por su ID interno,
-- revisar productos sin stock,
-- o ubicar un pedido puntual.
 
 ## 7. Cambiar la columna principal del registro
 
@@ -250,63 +128,36 @@ Para cambiarla:
 3. Elige otra columna.
 4. Haz clic en `Actualizar columna`.
 
-Esto hace que los registros pasen a mostrarse con el valor de esa columna.
-
-Ejemplo:
-
-- antes el registro se mostraba por `Nombre`,
-- ahora puedes hacer que se muestre por `SKU` o por cualquier otro campo.
-
 ## 8. Editar la estructura de la base
 
-Si quieres adaptar la base a tu negocio:
+En `Estructura` puedes:
 
-1. Ve a la pestaña `Estructura`.
-2. Revisa los campos actuales.
-3. Usa `Agregar campo o relacion` para sumar uno nuevo.
-4. Usa `Editar` dentro de una tarjeta para modificar uno existente.
+- crear campos nuevos,
+- editar campos existentes,
+- duplicar campos,
+- moverlos arriba o abajo,
+- crear relaciones con otras bases,
+- y cambiar la columna principal del registro.
 
-Al crear o editar un campo, puedes definir:
+### Reordenar campos
 
-- nombre del campo,
-- tipo,
-- ayuda opcional,
-- si es obligatorio,
-- si debe verse en la tabla principal.
+En cada tarjeta de campo puedes usar:
 
-### Tipos de campo disponibles
+- `Subir`
+- `Bajar`
 
-Puedes crear campos de:
+Esto cambia el orden visual en formularios, tabla y detalle.
 
-- texto,
-- numero,
-- moneda,
-- si / no,
-- fecha,
-- email,
-- telefono,
-- seleccion,
-- relacion con otra base.
+### Duplicar campos
 
-## 9. Crear un campo de seleccion
+Si necesitas un campo parecido a otro:
 
-Si quieres que un dato tenga opciones fijas:
+1. Ve a la tarjeta del campo.
+2. Haz clic en `Duplicar`.
 
-1. En `Estructura`, crea o edita un campo.
-2. Elige tipo `Seleccion`.
-3. En opciones, escribe una opcion por linea.
+Se creara un nuevo campo con configuracion similar.
 
-Ejemplo:
-
-```text
-Pendiente
-En curso
-Completado
-```
-
-Esto ayuda a mantener consistencia y evitar errores al cargar datos.
-
-## 10. Relacionar una base con otra
+## 9. Relacionar una base con otra
 
 Las relaciones sirven para conectar informacion.
 
@@ -319,188 +170,89 @@ Ejemplos:
 
 ### Como crear una relacion
 
-1. Crea o abre la base principal.
-2. Ve a `Estructura`.
-3. Crea un nuevo campo.
-4. Elige tipo `Relacion con otra base`.
-5. Selecciona la base relacionada.
-6. Guarda.
+1. Ve a `Estructura`.
+2. Crea un nuevo campo.
+3. Elige tipo `Relacion con otra base`.
+4. Selecciona la base relacionada.
+5. Guarda.
 
-Luego, cuando cargues un registro, podras elegir un elemento de la otra base.
+## 10. Buscar dentro de un campo de relacion
 
-### Ejemplo
+Cuando cargas o editas un registro y aparece un campo de relacion:
 
-Si tienes:
-
-- una base `Clientes`
-- y una base `Pedidos`
-
-Puedes crear en `Pedidos` un campo `Cliente` que apunte a la base `Clientes`.
-
-Despues, cada pedido podra vincularse a un cliente real.
+1. Usa la caja de busqueda del campo.
+2. Escribe texto o un ID.
+3. El sistema filtrara los registros disponibles de esa base relacionada.
 
 ## 11. Crear un registro relacionado sin salir del formulario
 
 Si al cargar un registro todavia no existe el elemento relacionado:
 
-1. En el campo de relacion, abre el selector.
-2. Elige la opcion para agregar un nuevo registro relacionado.
-3. Se abrira un modal dentro de la misma ventana.
-4. Carga el nuevo registro.
-5. Guarda.
+1. En el campo de relacion, elige la opcion para agregar un nuevo registro relacionado.
+2. Se abrira un modal dentro de la misma ventana.
+3. Carga el nuevo registro.
+4. Guarda.
 
 Al cerrar el modal, ese nuevo registro quedara seleccionado automaticamente en el formulario original.
 
-Esto es util, por ejemplo, si estas creando un pedido y todavia no existe el cliente.
+## 12. Ver estadisticas
 
-## 12. Navegar relaciones en ambos sentidos
+En `Estadisticas` puedes analizar campos de tu base.
 
-Cuando abras el detalle de un registro relacionado, EasierDataBases te mostrara:
+### Que ofrece hoy
 
-- las relaciones salientes: a que otros registros apunta,
-- las relaciones entrantes: que otros registros lo referencian.
+- resumen automatico,
+- estadisticas utiles para operar,
+- analisis por campo,
+- barras, torta, tabla o metricas,
+- interpretacion textual,
+- comparacion con periodos previos,
+- guardado de estadisticas.
 
-Ademas, en la tabla de `Registros`, si haces clic sobre el valor de un campo relacionado, se abre una tarjeta contextual centrada con:
+### Como usarla
 
-- nombre del registro relacionado,
-- base a la que pertenece,
-- algunos datos visibles,
-- acceso para abrirlo o editarlo.
+1. Entra en `Estadisticas`.
+2. En `Constructor de estadisticas`, elige un campo.
+3. Elige el tipo de grafico disponible para ese campo.
+4. Si quieres, abre `Opciones avanzadas`.
+5. Haz clic en `Analizar`.
 
-## 13. Usar modo oscuro
+Si activas `Comparacion`, podras comparar con:
 
-En la barra superior veras un boton para cambiar el tema.
+- ultimos 7 dias previos,
+- ultimos 30 dias previos,
+- comparacion manual.
 
-Puedes:
-
-- activar modo oscuro,
-- volver a modo claro,
-- y el sistema recordara tu eleccion al navegar por la app.
-
-Esto afecta la landing, dashboard, bases, formularios, tablas y modales.
-
-## 14. Importar datos desde CSV
-
-Si ya tienes datos en Excel o en otra herramienta, puedes importarlos.
-
-### Paso a paso
+## 13. Importar datos desde CSV
 
 1. Ve a `Gestion`.
 2. En `Importacion guiada`, selecciona tu archivo `.csv`.
 3. Indica si el archivo tiene encabezados.
-4. Haz clic en continuar para mapear columnas.
-5. En la pantalla siguiente, relaciona cada columna con el dato correcto.
+4. Continua para mapear columnas.
+5. Relaciona cada columna con el dato correcto.
 6. Confirma la importacion.
 
-### Ejemplo de mapeo
-
-Si tu CSV tiene:
-
-- `Nombre`
-- `Precio`
-- `Stock`
-
-Puedes mapear:
-
-- `Nombre` -> `Nombre`
-- `Precio` -> `Precio`
-- `Stock` -> `Stock`
-
-### Resultado
-
-Al finalizar veras:
-
-- cuantas filas se detectaron,
-- cuantas se importaron,
-- cuantas se omitieron,
-- y algunos errores si hubo filas invalidas.
-
-En relaciones, la importacion puede resolver por ID o por nombre unico. Si hay duplicados, te pedira usar el ID.
-
-## 15. Exportar una base a CSV
-
-Para sacar una copia de tus datos:
+## 14. Exportar una base a CSV
 
 1. Ve a `Gestion`.
 2. Haz clic en `Exportar CSV`.
 
-Se descargara un archivo con:
-
-- todos los campos visibles de la base,
-- y `Prioridad` si esa base la usa.
-
-## 16. Compartir la base con otras personas
+## 15. Compartir la base con otras personas
 
 Si quieres trabajar con alguien mas:
 
 1. Ve a `Gestion`.
-2. Busca la seccion `Equipo y permisos`.
+2. Busca `Equipo y permisos`.
 3. Escribe el nombre de usuario.
 4. Elige un rol.
 5. Guarda.
 
-### Roles disponibles
+Roles disponibles:
 
-`Administrador`
+- `Administrador`
+- `Editor`
 
-- puede editar estructura,
-- importar/exportar,
-- gestionar miembros,
-- y eliminar la base.
-
-`Editor`
-
-- puede trabajar con registros,
-- pero no cambiar la estructura de la base.
-
-## 17. Editar un registro existente
-
-Para modificar datos ya cargados:
-
-1. Entra en `Registros`.
-2. Busca el elemento.
-3. Haz clic en `Editar`.
-4. Cambia los datos necesarios.
-5. Guarda.
-
-Si luego vas a `Historial`, podras ver ese movimiento y, en muchos casos, revisar que cambio del valor anterior al nuevo.
-
-## 18. Eliminar un registro o una base
-
-### Eliminar un registro
-
-1. Entra en `Registros`.
-2. Busca el elemento.
-3. Haz clic en `Eliminar`.
-4. Confirma.
-
-### Eliminar una base
-
-Si eres administrador:
-
-1. Ve a `Gestion`.
-2. Busca la zona sensible.
-3. Elige eliminar la base.
-4. Escribe el nombre exacto de la base.
-5. Escribe `ELIMINAR`.
-6. Confirma.
-
-Esto evita borrados accidentales.
-
-## 19. Ver estadisticas
-
-En `Resumen` veras un acceso a `Graficos (estadisticas)`.
-
-Hoy esa vista todavia no calcula estadisticas reales, pero anticipa lo que vendra:
-
-- graficos por campos seleccionados,
-- distribuciones,
-- conteos,
-- y resumenes reutilizables.
-
-## 20. Revisar el historial de la base
-
-Si quieres controlar cambios o saber que paso:
+## 16. Revisar el historial de la base
 
 1. Entra en la base.
 2. Ve a `Historial`.
@@ -511,92 +263,26 @@ Que puedes encontrar ahi:
 
 - registros agregados,
 - registros editados,
+- registros duplicados,
 - registros eliminados,
 - cambios en estructura,
 - importaciones,
 - exportaciones,
 - y cambios de permisos.
 
-## 21. Consejos para empezar bien
-
-Si es tu primera base, conviene este orden:
-
-1. Elige una plantilla parecida a tu caso.
-2. Deja algunos campos base activados.
-3. Agrega solo los extras realmente utiles.
-4. Carga algunos registros de ejemplo.
-5. Revisa la pestaña `Registros`.
-6. Ajusta la estructura en `Estructura`.
-7. Importa un CSV real cuando ya entiendas el modelo.
-
-## 22. Buenas practicas
-
-- Empieza simple. No intentes definir todo desde el primer dia.
-- Usa nombres de campos claros y cortos.
-- Usa campos de seleccion cuando quieras datos consistentes.
-- Crea relaciones solo cuando de verdad conecten informacion.
-- Elige bien que columna identifica al registro.
-- Antes de importar muchos datos, prueba con un CSV chico.
-
-## 23. Que no hace todavia EasierDataBases
-
-En esta version, la herramienta no incluye todavia:
-
-- automatizaciones avanzadas,
-- dashboards,
-- reportes complejos,
-- permisos finos por campo,
-- workflows empresariales avanzados,
-- estadisticas funcionales dentro del modulo de graficos.
-
-La idea del producto hoy es resolver bien bases simples y operativas.
-
-## 24. Ejemplo de primer recorrido recomendado
-
-Si quieres aprender rapido, prueba este caso:
-
-### Base 1. Clientes
-
-Campos recomendados:
-
-- Nombre
-- Empresa
-- Email
-- Telefono
-
-### Base 2. Pedidos
-
-Campos recomendados:
-
-- Fecha
-- Estado
-- Importe
-- Cliente (relacion con Clientes)
-
-Con estas dos bases puedes practicar:
-
-- creacion de bases,
-- campos personalizados,
-- relaciones,
-- carga de registros,
-- creacion inline de relacionados,
-- navegacion entre datos,
-- filtros,
-- e importacion/exportacion.
-
-## 25. Resumen final
+## 17. Resumen final
 
 Con EasierDataBases puedes:
 
 - crear una base sin programar,
 - personalizar sus campos,
 - elegir que columna representa al registro,
-- cargar y buscar registros,
+- cargar, duplicar, buscar y ordenar registros,
+- filtrar por tipo de dato,
 - relacionar informacion,
+- buscar dentro de relaciones por ID o texto,
 - crear registros relacionados sin salir del flujo,
+- analizar tu base con estadisticas,
 - revisar el historial de movimientos,
-- usar la app en modo claro u oscuro,
 - importar y exportar CSV,
 - y trabajar con otras personas usando roles basicos.
-
-La mejor forma de empezar es crear una primera base simple, usarla unos dias y luego ajustar su estructura segun tu necesidad real.

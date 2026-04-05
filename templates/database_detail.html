@@ -635,8 +635,8 @@
                         <p>La tabla queda al frente para que puedas revisar datos apenas entras.</p>
                     </div>
                     <div class="view-switch">
-                        <a class="pill {% if view_mode == 'table' %}is-active{% endif %}" href="?tab=records&record_id={{ selected_record_id }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view=table">Tabla</a>
-                        <a class="pill {% if view_mode == 'cards' %}is-active{% endif %}" href="?tab=records&record_id={{ selected_record_id }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view=cards">Tarjetas</a>
+                        <a class="pill {% if view_mode == 'table' %}is-active{% endif %}" href="?{{ records_query_base }}&view=table">Tabla</a>
+                        <a class="pill {% if view_mode == 'cards' %}is-active{% endif %}" href="?{{ records_query_base }}&view=cards">Tarjetas</a>
                     </div>
                 </div>
                 {% if view_mode == 'cards' %}
@@ -675,14 +675,43 @@
                                     {% endfor %}
                                 </div>
                                 <div class="hero-actions">
-                                    <a href="{% url 'record_edit' database.slug record.pk %}">Editar</a>
-                                    <a href="{% url 'record_delete' database.slug record.pk %}">Eliminar</a>
+                                    {% if archived_mode %}
+                                        <form method="post" action="{% url 'record_restore' database.slug record.pk %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{% url 'database_detail' database.slug %}?tab=records&archived=1&view=cards">
+                                            <button type="submit" class="button subtle compact-button">Restaurar</button>
+                                        </form>
+                                    {% else %}
+                                    <details class="record-actions-menu">
+                                        <summary class="record-actions-trigger" aria-label="Opciones del registro">⋯</summary>
+                                        <div class="record-actions-dropdown">
+                                            <a href="{% url 'record_edit' database.slug record.pk %}">Editar</a>
+                                            <form method="post" action="{% url 'record_duplicate' database.slug record.pk %}">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="q" value="{{ query }}">
+                                                <input type="hidden" name="priority" value="{{ selected_priority }}">
+                                                <input type="hidden" name="view" value="{{ view_mode }}">
+                                                <input type="hidden" name="sort" value="{{ sort }}">
+                                                <input type="hidden" name="direction" value="{{ sort_direction }}">
+                                                {% for key, value in record_filter_values.items %}
+                                                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                                                {% endfor %}
+                                                <button type="submit" class="record-action-item">Duplicar</button>
+                                            </form>
+                                            <form method="post" action="{% url 'record_archive' database.slug record.pk %}">
+                                                {% csrf_token %}
+                                                <button type="submit" class="record-action-item">Archivar</button>
+                                            </form>
+                                            <button type="button" class="record-action-item is-danger" data-record-delete-trigger data-delete-url="{% url 'record_delete' database.slug record.pk %}" data-delete-title="{{ record.title|escape }}" data-delete-next="{% url 'database_detail' database.slug %}?tab=records&view=cards">Eliminar</button>
+                                        </div>
+                                    </details>
+                                    {% endif %}
                                 </div>
                             </article>
                         {% empty %}
                             <div class="empty-state">
-                                <h3>Todavia no hay registros cargados</h3>
-                                <p>Puedes crear uno manualmente o importar un CSV.</p>
+                                <h3>{% if archived_mode %}Todavia no hay registros archivados{% else %}Todavia no hay registros cargados{% endif %}</h3>
+                                <p>{% if archived_mode %}Cuando archives registros, apareceran aqui para poder restaurarlos.{% else %}Puedes crear uno manualmente o importar un CSV.{% endif %}</p>
                             </div>
                         {% endfor %}
                     </div>
@@ -691,11 +720,33 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Registro</th>
-                                    {% if has_priority %}<th>Prioridad</th>{% endif %}
+                                    <th>
+                                        <a class="table-sort-link {% if sort == 'id' %}is-active{% endif %}" href="?{{ records_query_base }}&sort=id&direction={% if sort == 'id' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}&view={{ view_mode }}">
+                                            ID
+                                            {% if sort == 'id' %}<span>{% if sort_direction == 'asc' %}↑{% else %}↓{% endif %}</span>{% endif %}
+                                        </a>
+                                    </th>
+                                    <th>
+                                        <a class="table-sort-link {% if sort == 'title' %}is-active{% endif %}" href="?{{ records_query_base }}&sort=title&direction={% if sort == 'title' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}&view={{ view_mode }}">
+                                            Registro
+                                            {% if sort == 'title' %}<span>{% if sort_direction == 'asc' %}↑{% else %}↓{% endif %}</span>{% endif %}
+                                        </a>
+                                    </th>
+                                    {% if has_priority %}
+                                        <th>
+                                            <a class="table-sort-link {% if sort == 'priority' %}is-active{% endif %}" href="?{{ records_query_base }}&sort=priority&direction={% if sort == 'priority' and sort_direction == 'asc' %}desc{% else %}asc{% endif %}&view={{ view_mode }}">
+                                                Prioridad
+                                                {% if sort == 'priority' %}<span>{% if sort_direction == 'asc' %}↑{% else %}↓{% endif %}</span>{% endif %}
+                                            </a>
+                                        </th>
+                                    {% endif %}
                                     {% for field in table_fields %}
-                                        <th>{{ field.label }}</th>
+                                        <th>
+                                            <a class="table-sort-link {% if sort == 'field:'|add:field.key %}is-active{% endif %}" href="?{{ records_query_base }}&sort=field:{{ field.key }}&direction={% if sort == 'field:'|add:field.key and sort_direction == 'asc' %}desc{% else %}asc{% endif %}&view={{ view_mode }}">
+                                                {{ field.label }}
+                                                {% if sort == 'field:'|add:field.key %}<span>{% if sort_direction == 'asc' %}↑{% else %}↓{% endif %}</span>{% endif %}
+                                            </a>
+                                        </th>
                                     {% endfor %}
                                     <th></th>
                                 </tr>
@@ -724,13 +775,42 @@
                                             </td>
                                         {% endfor %}
                                         <td class="actions">
-                                            <a href="{% url 'record_edit' database.slug record.pk %}">Editar</a>
-                                            <a href="{% url 'record_delete' database.slug record.pk %}">Eliminar</a>
+                                            {% if archived_mode %}
+                                                <form method="post" action="{% url 'record_restore' database.slug record.pk %}">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="next" value="{% url 'database_detail' database.slug %}?tab=records&archived=1&view=table">
+                                                    <button type="submit" class="button subtle compact-button">Restaurar</button>
+                                                </form>
+                                            {% else %}
+                                            <details class="record-actions-menu">
+                                                <summary class="record-actions-trigger" aria-label="Opciones del registro">⋯</summary>
+                                                <div class="record-actions-dropdown">
+                                                    <a href="{% url 'record_edit' database.slug record.pk %}">Editar</a>
+                                                    <form method="post" action="{% url 'record_duplicate' database.slug record.pk %}">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="q" value="{{ query }}">
+                                                        <input type="hidden" name="priority" value="{{ selected_priority }}">
+                                                        <input type="hidden" name="view" value="{{ view_mode }}">
+                                                        <input type="hidden" name="sort" value="{{ sort }}">
+                                                        <input type="hidden" name="direction" value="{{ sort_direction }}">
+                                                        {% for key, value in record_filter_values.items %}
+                                                            <input type="hidden" name="{{ key }}" value="{{ value }}">
+                                                        {% endfor %}
+                                                        <button type="submit" class="record-action-item">Duplicar</button>
+                                                    </form>
+                                                    <form method="post" action="{% url 'record_archive' database.slug record.pk %}">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="record-action-item">Archivar</button>
+                                                    </form>
+                                                    <button type="button" class="record-action-item is-danger" data-record-delete-trigger data-delete-url="{% url 'record_delete' database.slug record.pk %}" data-delete-title="{{ record.title|escape }}" data-delete-next="{% url 'database_detail' database.slug %}?tab=records&view=table">Eliminar</button>
+                                                </div>
+                                            </details>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="99">Todavia no hay registros cargados.</td>
+                                        <td colspan="99">{% if archived_mode %}Todavia no hay registros archivados.{% else %}Todavia no hay registros cargados.{% endif %}</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -740,11 +820,11 @@
                 {% if page_obj.paginator.num_pages > 1 %}
                     <div class="pagination">
                         {% if page_obj.has_previous %}
-                            <a class="button subtle" href="?tab=records&record_id={{ selected_record_id }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view={{ view_mode }}&page={{ page_obj.previous_page_number }}">Anterior</a>
+                            <a class="button subtle" href="?{{ records_query_base }}&page={{ page_obj.previous_page_number }}">Anterior</a>
                         {% endif %}
                         <span class="pill is-active">Pagina {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
                         {% if page_obj.has_next %}
-                            <a class="button subtle" href="?tab=records&record_id={{ selected_record_id }}&q={{ query }}&priority={{ selected_priority }}&sort={{ sort }}&view={{ view_mode }}&page={{ page_obj.next_page_number }}">Siguiente</a>
+                            <a class="button subtle" href="?{{ records_query_base }}&page={{ page_obj.next_page_number }}">Siguiente</a>
                         {% endif %}
                     </div>
                 {% endif %}
@@ -753,10 +833,15 @@
             <aside class="records-side">
                 <div class="panel-head">
                     <h2>Buscar y operar elementos</h2>
-                    <p>Filtros, vistas guardadas y acciones rapidas en una columna lateral.</p>
+                    <p>Filtros y acciones rapidas en una columna lateral.</p>
                 </div>
                 <div class="hero-actions records-side-actions">
-                    <a class="button" href="{% url 'record_create' database.slug %}">Agregar registro</a>
+                    {% if not archived_mode %}
+                        <a class="button" href="{% url 'record_create' database.slug %}">Agregar registro</a>
+                    {% endif %}
+                    <a class="button subtle" href="?tab=records{% if not archived_mode %}&archived=1{% endif %}&view={{ view_mode }}">
+                        {% if archived_mode %}Ver activos{% else %}Ver archivados ({{ archived_records_count }}){% endif %}
+                    </a>
                 </div>
                 {% if import_summary %}
                     <div class="import-summary">
@@ -776,8 +861,8 @@
                 {% endif %}
                 <form method="get" class="toolbar toolbar-vertical top-gap">
                     <input type="hidden" name="tab" value="records">
-                    <input type="text" name="record_id" value="{{ selected_record_id }}" placeholder="ID exacto">
-                    <input type="text" name="q" value="{{ query }}" placeholder="Buscar por nombre o contenido...">
+                    {% if archived_mode %}<input type="hidden" name="archived" value="1">{% endif %}
+                    <input type="text" name="q" value="{{ query|default:selected_record_id }}" placeholder="Buscar por ID, nombre o contenido...">
                     {% if has_priority %}
                         <select name="priority">
                             <option value="">Todas las prioridades</option>
@@ -791,12 +876,165 @@
                             <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
+                    {% if record_filter_definitions %}
+                        <details class="stats-advanced-details" {% if record_filters_active %}open{% endif %}>
+                            <summary>Filtros avanzados</summary>
+                            <div class="stats-builder-grid stats-builder-grid-advanced">
+                                {% for item in record_filter_definitions %}
+                                    {% if item.kind == 'select' or item.kind == 'boolean' or item.kind == 'relation' %}
+                                        <label class="field">
+                                            <span>{{ item.label }}</span>
+                                            <select name="{{ item.name }}">
+                                                <option value="">Todos</option>
+                                                {% for value, label in item.options %}
+                                                    <option value="{{ value }}" {% if record_filter_values|get_item:item.name|stringformat:"s" == value|stringformat:"s" %}selected{% endif %}>
+                                                        {% if item.kind == 'relation' %}#{{ value }} - {{ label }}{% else %}{{ label }}{% endif %}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </label>
+                                    {% elif item.kind == 'range' %}
+                                        <label class="field">
+                                            <span>{{ item.label }} minimo</span>
+                                            <input type="number" step="0.01" name="{{ item.min_name }}" value="{{ record_filter_values|get_item:item.min_name }}">
+                                        </label>
+                                        <label class="field">
+                                            <span>{{ item.label }} maximo</span>
+                                            <input type="number" step="0.01" name="{{ item.max_name }}" value="{{ record_filter_values|get_item:item.max_name }}">
+                                        </label>
+                                    {% elif item.kind == 'date_range' %}
+                                        <label class="field">
+                                            <span>{{ item.label }} desde</span>
+                                            <input type="date" name="{{ item.from_name }}" value="{{ record_filter_values|get_item:item.from_name }}">
+                                        </label>
+                                        <label class="field">
+                                            <span>{{ item.label }} hasta</span>
+                                            <input type="date" name="{{ item.to_name }}" value="{{ record_filter_values|get_item:item.to_name }}">
+                                        </label>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </details>
+                    {% endif %}
+                    <input type="hidden" name="direction" value="{{ sort_direction }}">
                     <input type="hidden" name="view" value="{{ view_mode }}">
-                    <button type="submit" class="button subtle">Aplicar</button>
+                    <div class="hero-actions">
+                        <button type="submit" class="button subtle">Aplicar</button>
+                        <a class="button subtle" href="?tab=records{% if archived_mode %}&archived=1{% endif %}&view={{ view_mode }}">Limpiar filtros</a>
+                    </div>
                 </form>
             </aside>
         </div>
     </section>
+    <script>
+        (() => {
+            const menus = Array.from(document.querySelectorAll(".record-actions-menu"));
+            if (!menus.length) {
+                return;
+            }
+
+            const getFloatingDropdown = (menu) =>
+                document.body.querySelector(`.record-actions-dropdown.is-floating[data-menu-id="${menu.dataset.menuId}"]`);
+
+            const restoreDropdown = (menu) => {
+                const dropdown = getFloatingDropdown(menu);
+                if (!dropdown) {
+                    return;
+                }
+                dropdown.classList.remove("is-floating");
+                dropdown.style.top = "";
+                dropdown.style.left = "";
+                dropdown.style.width = "";
+                menu.appendChild(dropdown);
+            };
+
+            const closeMenu = (menu) => {
+                menu.removeAttribute("open");
+                restoreDropdown(menu);
+            };
+
+            const closeAllMenus = () => {
+                menus.forEach((menu) => closeMenu(menu));
+            };
+
+            const positionMenu = (menu) => {
+                const trigger = menu.querySelector(".record-actions-trigger");
+                const dropdown = getFloatingDropdown(menu);
+                if (!trigger || !dropdown) {
+                    return;
+                }
+                const rect = trigger.getBoundingClientRect();
+                const dropdownWidth = dropdown.offsetWidth || 132;
+                const dropdownHeight = dropdown.offsetHeight || 120;
+                let left = rect.right + 6;
+                let top = rect.top;
+
+                if (left + dropdownWidth > window.innerWidth - 12) {
+                    left = Math.max(12, rect.left - dropdownWidth - 6);
+                }
+
+                if (top + dropdownHeight > window.innerHeight - 12) {
+                    top = Math.max(12, window.innerHeight - dropdownHeight - 12);
+                }
+
+                dropdown.style.left = `${left}px`;
+                dropdown.style.top = `${top}px`;
+            };
+
+            menus.forEach((menu, index) => {
+                menu.dataset.menuId = `record-menu-${index}`;
+                menu.addEventListener("toggle", () => {
+                    if (!menu.open) {
+                        restoreDropdown(menu);
+                        return;
+                    }
+                    menus.forEach((other) => {
+                        if (other !== menu) {
+                            other.removeAttribute("open");
+                            restoreDropdown(other);
+                        }
+                    });
+                    const dropdown = menu.querySelector(".record-actions-dropdown");
+                    if (dropdown) {
+                        dropdown.dataset.menuId = menu.dataset.menuId;
+                        dropdown.classList.add("is-floating");
+                        dropdown.style.width = `${Math.max(dropdown.offsetWidth || 132, 132)}px`;
+                        document.body.appendChild(dropdown);
+                    }
+                    positionMenu(menu);
+                });
+            });
+
+            document.addEventListener("click", (event) => {
+                if (event.target.closest(".record-actions-menu") || event.target.closest(".record-actions-dropdown")) {
+                    return;
+                }
+                closeAllMenus();
+            });
+
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") {
+                    closeAllMenus();
+                }
+            });
+
+            window.addEventListener("resize", () => {
+                menus.forEach((menu) => {
+                    if (menu.open) {
+                        positionMenu(menu);
+                    }
+                });
+            });
+
+            window.addEventListener(
+                "scroll",
+                () => {
+                    closeAllMenus();
+                },
+                true
+            );
+        })();
+    </script>
     <div class="related-preview-card" id="related-preview-card" hidden>
         <div class="related-preview-backdrop" data-related-preview-close></div>
         <div class="related-preview-panel">
@@ -1064,14 +1302,27 @@
             <div class="structure-grid">
                 {% for item in field_cards %}
                     <article class="field-card" id="field-card-{{ item.field.pk }}">
-                        <div class="member-row">
-                            <div>
+                        <div class="field-card-head">
+                            <div class="field-card-title">
                                 <strong>{{ item.field.label }}</strong>
-                                <p class="field-key">{{ item.field.key }}</p>
+                                {% if membership.role == 'admin' %}
+                                    <div class="field-reorder-actions">
+                                        <form method="post" action="{% url 'field_move' database.slug item.field.pk 'up' %}" data-field-move-form data-direction="up" data-field-id="{{ item.field.pk }}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="field-move-button" aria-label="Mover arriba" {% if item.is_first %}disabled{% endif %}>â†‘</button>
+                                        </form>
+                                        <form method="post" action="{% url 'field_move' database.slug item.field.pk 'down' %}" data-field-move-form data-direction="down" data-field-id="{{ item.field.pk }}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="field-move-button" aria-label="Mover abajo" {% if item.is_last %}disabled{% endif %}>â†“</button>
+                                        </form>
+                                    </div>
+                                {% endif %}
                             </div>
                             <span class="pill">{{ item.field.get_field_type_display }}</span>
                         </div>
-                        <p>{{ item.field.help_text|default:"Sin ayuda configurada." }}</p>
+                        {% if item.field.help_text %}
+                            <p class="field-help-text">{{ item.field.help_text }}</p>
+                        {% endif %}
                         <div class="tag-list">
                             {% if item.field.is_primary %}<span class="tag">Nombre visible del registro</span>{% endif %}
                             {% if item.field.required %}<span class="tag">Obligatorio</span>{% endif %}
@@ -1088,10 +1339,14 @@
                         </div>
                         <div class="field-card-actions">
                             {% if membership.role == 'admin' %}
-                                <button type="button" class="pill is-active inline-toggle-button" data-toggle-target="field-editor-{{ item.field.pk }}">Editar</button>
+                                <form method="post" action="{% url 'field_duplicate' database.slug item.field.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="field-action-button">Duplicar</button>
+                                </form>
+                                <button type="button" class="field-action-button inline-toggle-button" data-toggle-target="field-editor-{{ item.field.pk }}">Editar</button>
                                 <form method="post" action="{% url 'field_delete' database.slug item.field.pk %}">
                                     {% csrf_token %}
-                                    <button type="submit" class="field-delete-button">Eliminar</button>
+                                    <button type="submit" class="field-action-button field-action-danger">Eliminar</button>
                                 </form>
                             {% endif %}
                         </div>
@@ -1205,6 +1460,66 @@
                         };
 
                         document.querySelectorAll("form.stack-form").forEach(bindConditionalFields);
+
+                        const structureGrid = document.querySelector(".structure-grid");
+                        const moveForms = Array.from(document.querySelectorAll("[data-field-move-form]"));
+                        const updateMoveButtons = () => {
+                            const cards = Array.from(document.querySelectorAll(".structure-grid .field-card"));
+                            cards.forEach((card, index) => {
+                                const upButton = card.querySelector('[data-direction="up"] button');
+                                const downButton = card.querySelector('[data-direction="down"] button');
+                                if (upButton) {
+                                    upButton.disabled = index === 0;
+                                }
+                                if (downButton) {
+                                    downButton.disabled = index === cards.length - 1;
+                                }
+                            });
+                        };
+
+                        moveForms.forEach((form) => {
+                            form.addEventListener("submit", async (event) => {
+                                event.preventDefault();
+                                const submitButton = form.querySelector("button[type='submit']");
+                                if (!submitButton || submitButton.disabled) {
+                                    return;
+                                }
+                                submitButton.disabled = true;
+                                let restoreButtonState = true;
+                                try {
+                                    const response = await fetch(form.action, {
+                                        method: "POST",
+                                        body: new FormData(form),
+                                        credentials: "same-origin",
+                                        headers: {
+                                            "X-Requested-With": "XMLHttpRequest",
+                                        },
+                                    });
+                                    if (!response.ok) {
+                                        throw new Error("move-failed");
+                                    }
+                                    const payload = await response.json();
+                                    if (payload.moved && structureGrid && Array.isArray(payload.ordered_ids)) {
+                                        payload.ordered_ids.forEach((fieldId) => {
+                                            const card = document.getElementById(`field-card-${fieldId}`);
+                                            if (card) {
+                                                structureGrid.appendChild(card);
+                                            }
+                                        });
+                                    }
+                                    updateMoveButtons();
+                                    restoreButtonState = false;
+                                } catch (_error) {
+                                    window.location.reload();
+                                } finally {
+                                    if (restoreButtonState) {
+                                        submitButton.disabled = false;
+                                    }
+                                }
+                            });
+                        });
+
+                        updateMoveButtons();
                     })();
                 </script>
             {% else %}
@@ -1224,9 +1539,26 @@
                 <h2>Datos y operaciones</h2>
                 <p>Importa datos reales, exporta la base o mueve informacion fuera del sistema.</p>
             </div>
-            <form method="post" action="{% url 'records_import' database.slug %}" enctype="multipart/form-data" class="stack-form compact">
+            <div class="import-flow-intro">
+                <div class="import-flow-step is-active">
+                    <span class="import-flow-number">1</span>
+                    <div>
+                        <strong>Subir archivo CSV</strong>
+                        <p>Elige el archivo y preparalo para revisar sus columnas.</p>
+                    </div>
+                </div>
+                <div class="import-flow-step">
+                    <span class="import-flow-number">2</span>
+                    <div>
+                        <strong>Mapear columnas e importar</strong>
+                        <p>En la siguiente pantalla vas a confirmar a que campo corresponde cada columna.</p>
+                    </div>
+                </div>
+            </div>
+            <form method="post" action="{% url 'records_import' database.slug %}" enctype="multipart/form-data" class="stack-form compact import-upload-form">
                 {% csrf_token %}
-                <h3>Importacion guiada</h3>
+                <h3>Paso 1: subir archivo</h3>
+                <p class="muted-copy">Despues de este paso veras una vista previa del CSV y una pantalla para asignar cada columna al dato correcto.</p>
                 {% for field in import_form %}
                     <label class="field">
                         <span>{{ field.label }}</span>
@@ -1235,8 +1567,12 @@
                         {{ field.errors }}
                     </label>
                 {% endfor %}
+                <div class="import-file-status" data-import-file-status>No hay ningun archivo seleccionado todavia.</div>
+                <div class="import-upload-note">
+                    Este paso no importa nada todavia. Solo prepara el archivo y te lleva a la revision y al mapeo.
+                </div>
                 <small>Primero subirás el archivo y luego podrás decidir a qué dato corresponde cada columna.</small>
-                <button type="submit" class="button">Siguiente: mapear columnas</button>
+                <button type="submit" class="button">Subir archivo y continuar</button>
             </form>
             <div class="hero-actions top-gap">
                 <a class="button subtle" href="{% url 'records_export' database.slug %}">Exportar CSV</a>
@@ -1273,6 +1609,68 @@
         </article>
 
         <article class="panel">
+            <div class="panel-head split">
+                <div>
+                    <h2>Archivados</h2>
+                    <p>Gestiona los registros archivados desde un solo lugar y decide si restaurarlos o eliminarlos definitivamente.</p>
+                </div>
+                <button type="button" class="button subtle" data-toggle-target="archived-records-panel">
+                    Ver archivados ({{ archived_records_count }})
+                </button>
+            </div>
+            <div class="inline-expander top-gap" id="archived-records-panel">
+                {% if archived_records_manage %}
+                    <div class="hero-actions">
+                        <form method="post" action="{% url 'records_restore_all' database.slug %}">
+                            {% csrf_token %}
+                            <button type="submit" class="button subtle">Restaurar todos</button>
+                        </form>
+                        {% if membership.role == 'admin' %}
+                            <button
+                                type="button"
+                                class="button danger"
+                                data-record-delete-trigger
+                                data-delete-url="{% url 'records_delete_all' database.slug %}"
+                                data-delete-title="todos los registros archivados"
+                                data-delete-next="{% url 'database_detail' database.slug %}?tab=manage"
+                                data-delete-copy="Vas a eliminar definitivamente todos los registros archivados. Esta accion no se puede deshacer."
+                                data-delete-button-label="Eliminar todos definitivamente"
+                            >
+                                Eliminar todos
+                            </button>
+                        {% endif %}
+                    </div>
+                    <div class="member-list top-gap archived-records-list">
+                        {% for record in archived_records_manage %}
+                            <div class="archived-record-row">
+                                <div>
+                                    <strong>{{ record.title }}</strong>
+                                    <p>
+                                        Archivado el {{ record.archived_at|date:"d/m/Y H:i" }}
+                                        {% if record.archived_by %}por {{ record.archived_by.username }}{% endif %}
+                                    </p>
+                                </div>
+                                <div class="hero-actions">
+                                    <form method="post" action="{% url 'record_restore' database.slug record.pk %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'database_detail' database.slug %}?tab=manage">
+                                        <button type="submit" class="button subtle compact-button">Restaurar</button>
+                                    </form>
+                                    <button type="button" class="button danger compact-button" data-record-delete-trigger data-delete-url="{% url 'record_delete' database.slug record.pk %}" data-delete-title="{{ record.title|escape }}" data-delete-next="{% url 'database_detail' database.slug %}?tab=manage">Eliminar</button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="empty-state top-gap">
+                        <h3>No hay registros archivados</h3>
+                        <p>Cuando archives registros, apareceran aqui para poder restaurarlos o eliminarlos definitivamente.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </article>
+
+        <article class="panel">
             <div class="panel-head">
                 <h2>Zona sensible</h2>
                 <p>Acciones de alto impacto sobre esta base. Revisa bien antes de continuar.</p>
@@ -1302,4 +1700,96 @@
         </article>
     </section>
 {% endif %}
+<div class="related-preview-card" id="record-delete-card" hidden>
+    <div class="related-preview-backdrop" data-record-delete-close></div>
+    <div class="related-preview-panel record-delete-panel">
+        <div class="member-row">
+            <div>
+                <span class="eyebrow">Eliminar registro</span>
+                <h3 id="record-delete-title">Confirmar eliminacion</h3>
+            </div>
+            <button type="button" class="modal-close-button" aria-label="Cerrar" data-record-delete-close>X</button>
+        </div>
+        <p class="record-delete-copy" id="record-delete-copy">Esta accion eliminara el registro definitivamente.</p>
+        <form method="post" id="record-delete-form" class="hero-actions">
+            {% csrf_token %}
+            <input type="hidden" name="next" id="record-delete-next" value="">
+            <button type="submit" class="button danger">Eliminar definitivamente</button>
+            <button type="button" class="button subtle" data-record-delete-close>Cancelar</button>
+        </form>
+    </div>
+</div>
+<script>
+    (() => {
+        const importFileInput = document.querySelector('.import-upload-form input[type="file"]');
+        const importFileStatus = document.querySelector("[data-import-file-status]");
+        if (!importFileInput || !importFileStatus) {
+            return;
+        }
+
+        const updateImportFileStatus = () => {
+            const fileName = importFileInput.files && importFileInput.files[0] ? importFileInput.files[0].name : "";
+            importFileStatus.textContent = fileName
+                ? `Archivo seleccionado: ${fileName}`
+                : "No hay ningun archivo seleccionado todavia.";
+            importFileStatus.classList.toggle("has-file", Boolean(fileName));
+        };
+
+        importFileInput.addEventListener("change", updateImportFileStatus);
+        updateImportFileStatus();
+    })();
+
+    (() => {
+        const archivedToggle = document.querySelector('[data-toggle-target="archived-records-panel"]');
+        const archivedPanel = document.getElementById("archived-records-panel");
+        if (!archivedToggle || !archivedPanel) {
+            return;
+        }
+
+        archivedToggle.addEventListener("click", () => {
+            archivedPanel.classList.toggle("is-open");
+        });
+    })();
+
+    (() => {
+        const deleteCard = document.getElementById("record-delete-card");
+        const deleteForm = document.getElementById("record-delete-form");
+        const deleteTitle = document.getElementById("record-delete-title");
+        const deleteCopy = document.getElementById("record-delete-copy");
+        const deleteNext = document.getElementById("record-delete-next");
+        const deleteSubmit = deleteForm.querySelector('button[type="submit"]');
+        const triggers = Array.from(document.querySelectorAll("[data-record-delete-trigger]"));
+        if (!deleteCard || !deleteForm || !deleteTitle || !deleteCopy || !deleteNext || !deleteSubmit || !triggers.length) {
+            return;
+        }
+
+        const closeDeleteCard = () => {
+            deleteCard.hidden = true;
+        };
+
+        triggers.forEach((trigger) => {
+            trigger.addEventListener("click", () => {
+                const title = trigger.dataset.deleteTitle || "este registro";
+                const copy = trigger.dataset.deleteCopy || `Vas a eliminar ${title} definitivamente. Esta accion no se puede deshacer.`;
+                const submitLabel = trigger.dataset.deleteButtonLabel || "Eliminar definitivamente";
+                deleteForm.action = trigger.dataset.deleteUrl || "#";
+                deleteNext.value = trigger.dataset.deleteNext || "";
+                deleteTitle.textContent = `Eliminar ${title}`;
+                deleteCopy.textContent = copy;
+                deleteSubmit.textContent = submitLabel;
+                deleteCard.hidden = false;
+            });
+        });
+
+        document.querySelectorAll("[data-record-delete-close]").forEach((item) => {
+            item.addEventListener("click", closeDeleteCard);
+        });
+
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && !deleteCard.hidden) {
+                closeDeleteCard();
+            }
+        });
+    })();
+</script>
 {% endblock %}

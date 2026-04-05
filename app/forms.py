@@ -419,11 +419,17 @@ class RecordForm(forms.Form):
             )
             if custom_field.relation_database:
                 field.widget.attrs["data-relation-field-key"] = custom_field.key
+                field.widget.attrs["data-relation-field-id"] = str(custom_field.pk)
                 field.widget.attrs["data-relation-create-url"] = reverse(
                     "record_create",
                     args=[custom_field.relation_database.slug],
                 )
+                field.widget.attrs["data-relation-search-url"] = reverse(
+                    "relation_record_search",
+                    args=[self.database.slug, custom_field.pk],
+                )
                 field.widget.attrs["data-relation-create-label"] = f"+ Agregar nuevo en {custom_field.relation_database.name}"
+                field.widget.attrs["data-relation-searchable"] = "true"
             return field
         return forms.CharField(**common)
 

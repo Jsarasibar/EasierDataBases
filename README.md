@@ -2,7 +2,7 @@
 
 EasierDataBases es una plataforma no-code construida con Django para crear, administrar y operar bases de datos simples desde una interfaz visual, sin requerir conocimientos tecnicos.
 
-El producto esta pensado para negocios y equipos que hoy resuelven su operacion con planillas desordenadas o con herramientas demasiado complejas para sus necesidades diarias. La propuesta actual del MVP es ofrecer una experiencia clara para crear bases operativas, definir campos personalizados, cargar registros, relacionar informacion y trabajar sobre esos datos con filtros, importacion/exportacion y colaboracion basica.
+El producto esta pensado para negocios y equipos que hoy resuelven su operacion con planillas desordenadas o con herramientas demasiado complejas para sus necesidades diarias. La propuesta actual del MVP es ofrecer una experiencia clara para crear bases operativas, definir campos personalizados, cargar registros, relacionar informacion y trabajar sobre esos datos con filtros, importacion/exportacion, estadisticas y colaboracion basica.
 
 ## Estado del proyecto
 
@@ -67,19 +67,24 @@ Casos de uso que hoy encajan bien:
   - seleccion
   - relacion con otra base
 - Editor visual de estructura.
+- Reordenamiento visual de campos.
+- Duplicado de campos.
 - Vista previa del formulario.
 - Selector visible para definir que columna identifica el nombre del registro.
 - Reglas de seguridad para evitar cambios destructivos.
 
 ### Operacion de registros
 
-- Crear, editar y eliminar registros.
+- Crear, editar, duplicar y eliminar registros.
 - Campo principal del registro configurable por base.
 - Prioridad opcional por base (`normal`, `high`, `urgent`).
 - Vista de tabla y vista de tarjetas.
-- Busqueda, filtros, orden, filtro por ID y paginacion.
+- Busqueda, filtros, orden por columnas, filtro por ID y paginacion.
+- Filtros avanzados segun el tipo de campo.
+- Menu `...` por registro con acciones rapidas.
+- Cambio rapido de prioridad desde el menu contextual.
 - Vista operativa centrada en `Registros`.
-- Pestaña `Trabajo diario`.
+- Pestana `Trabajo diario`.
 - Dark mode global con persistencia entre paginas.
 
 ### Relaciones entre bases
@@ -89,6 +94,7 @@ Casos de uso que hoy encajan bien:
 - Restriccion de relaciones segun acceso autorizado.
 - Tarjeta contextual al hacer clic sobre un valor relacionado en la tabla.
 - Posibilidad de crear un registro relacionado sin salir del formulario actual.
+- Busqueda en campos de relacion por ID o texto.
 
 ### Importacion y exportacion
 
@@ -108,25 +114,39 @@ Casos de uso que hoy encajan bien:
 - Restriccion de relaciones y registros segun acceso visible.
 - Eliminacion segura de bases con confirmacion explicita.
 
+### Estadisticas
+
+- Pestana `Estadisticas` dentro de cada base.
+- Resumen automatico.
+- Estadisticas utiles para operar.
+- Analisis por campo con visualizaciones adaptadas al tipo de dato.
+- Tipos de vista:
+  - barras
+  - torta
+  - tabla
+  - metricas
+- Interpretacion automatica del resultado.
+- Comparacion basica entre periodos.
+- Estadisticas guardadas por base.
+- Vista ampliada del grafico.
+
 ### Historial y trazabilidad
 
-- Pestaña `Historial` por base.
+- Pestana `Historial` por base.
 - Registro de movimientos con accion, usuario y fecha.
 - Tarjeta de detalle por movimiento.
 - Comparacion `antes / ahora` en cambios de registros.
 
-### Vistas del producto
+## Vistas del producto
 
-Cada base esta organizada en pestañas para reducir complejidad:
+Cada base esta organizada en pestanas para reducir complejidad:
 
 - `Registros`
 - `Trabajo diario`
-- `Resumen`
+- `Estadisticas`
 - `Estructura`
 - `Gestion`
 - `Historial`
-
-Ademas existe una vista separada de `Estadisticas`, actualmente marcada como `Coming soon`.
 
 ## Stack tecnologico
 
@@ -156,7 +176,8 @@ Entidades principales:
 - `DatabaseMembership`: define acceso y rol sobre cada base.
 - `CustomField`: modela los campos configurables.
 - `Record`: representa cada registro cargado.
-- `SavedView`: modelo heredado del MVP inicial, no expuesto actualmente en la interfaz principal.
+- `DatabaseActivity`: historial por base.
+- `SavedStatistic`: configuraciones guardadas del modulo de estadisticas.
 
 ## Seguridad y hardening ya implementado
 
@@ -173,16 +194,6 @@ Entidades principales:
 - Paginas 404 y 500.
 - `manage.py check --deploy` sin issues en la configuracion actual.
 
-## Requisitos
-
-- Python 3.14 o compatible
-- `pip`
-- Virtualenv recomendado
-
-Para produccion:
-
-- PostgreSQL 14+
-
 ## Instalacion local
 
 ### 1. Crear el entorno virtual
@@ -197,22 +208,10 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Si PowerShell bloquea la activacion por politica de ejecucion, puedes habilitar scripts para tu usuario:
+Si PowerShell bloquea la activacion por politica de ejecucion:
 
 ```powershell
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
-
-Y luego volver a ejecutar:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Si prefieres no activar el entorno, puedes usar directamente el ejecutable del entorno virtual:
-
-```powershell
-.\.venv\Scripts\python manage.py runserver
 ```
 
 ### 3. Instalar dependencias
@@ -223,9 +222,7 @@ pip install -r requirements.txt
 
 ### 4. Configurar variables de entorno
 
-Puedes usar `.env.example` como referencia. El proyecto lee automaticamente un archivo `.env` en la raiz si existe.
-
-Configuracion recomendada para desarrollo local:
+Ejemplo recomendado para desarrollo:
 
 ```env
 DJANGO_SECRET_KEY=replace-with-a-long-random-secret
@@ -234,18 +231,6 @@ DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,testserver
 DATABASE_URL=sqlite:///db.sqlite3
 DJANGO_DEFAULT_FROM_EMAIL=no-reply@easierdatabases.local
 DJANGO_EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
-```
-
-Notas importantes:
-
-- Para desarrollo normal, `DJANGO_DEBUG=True` es lo recomendado.
-- Con `python manage.py runserver`, EasierDataBases desactiva automaticamente la redireccion SSL local.
-- El servidor local debe abrirse con `http://localhost:8000/` o `http://127.0.0.1:8000/`.
-
-Ejemplo para PostgreSQL:
-
-```env
-DATABASE_URL=postgresql://usuario:clave@localhost:5432/easierdatabases
 ```
 
 ### 5. Aplicar migraciones
@@ -265,93 +250,27 @@ La app quedara disponible en:
 - [http://localhost:8000](http://localhost:8000)
 - [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
-Si tu navegador intenta forzar HTTPS en local, prueba con `http://localhost:8000/` en una ventana privada.
-
 ## Acceso por red local
-
-Para probar la app desde otros dispositivos de la misma red:
-
-1. Levanta el servidor escuchando en toda la red local:
 
 ```powershell
 python manage.py runserver 0.0.0.0:8000
 ```
 
-2. Averigua la IP IPv4 de tu equipo:
-
-```powershell
-ipconfig
-```
-
-3. Abre desde otro dispositivo:
+Luego abrir desde otro dispositivo:
 
 ```text
 http://TU_IP_LOCAL:8000
 ```
 
-Si no responde, revisa el firewall de Windows y permite el puerto `8000`.
-
 ## Comandos utiles
-
-Ejecutar tests:
 
 ```powershell
 python manage.py test
-```
-
-Chequeo general:
-
-```powershell
 python manage.py check
-```
-
-Chequeo de deploy:
-
-```powershell
 python manage.py check --deploy
-```
-
-Crear superusuario:
-
-```powershell
 python manage.py createsuperuser
-```
-
-Recolectar archivos estaticos:
-
-```powershell
 python manage.py collectstatic
 ```
-
-## Configuracion de entorno
-
-### Desarrollo
-
-- `DJANGO_DEBUG=True`
-- `DATABASE_URL=sqlite:///db.sqlite3`
-- backend de email por consola
-- `runserver` funciona por HTTP local sin redireccion forzada a HTTPS
-
-### Produccion
-
-Recomendaciones minimas:
-
-- `DJANGO_DEBUG=False`
-- `DATABASE_URL` apuntando a PostgreSQL
-- `DJANGO_ALLOWED_HOSTS` definido explicitamente
-- `DJANGO_SECRET_KEY` segura y privada
-- backend de email real
-- HTTPS terminado en proxy o balanceador
-
-El proyecto ya contempla:
-
-- `SECURE_SSL_REDIRECT`
-- `SESSION_COOKIE_SECURE`
-- `CSRF_COOKIE_SECURE`
-- `SECURE_HSTS_SECONDS`
-- `SECURE_HSTS_INCLUDE_SUBDOMAINS`
-- `SECURE_HSTS_PRELOAD`
-- `SECURE_PROXY_SSL_HEADER`
 
 ## Flujo principal del usuario
 
@@ -360,16 +279,17 @@ El proyecto ya contempla:
 3. Elige una plantilla o arranca desde cero.
 4. Selecciona los campos iniciales y agrega propios si hace falta.
 5. Empieza a operar registros desde `Registros`.
-6. Si necesita, usa `Trabajo diario`, edita la estructura, agrega relaciones, importa CSV o comparte acceso.
+6. Si necesita, usa `Trabajo diario`, analiza datos en `Estadisticas`, edita la estructura, agrega relaciones, importa CSV o comparte acceso.
 
 ## Experiencia actual del producto
 
-- El dashboard destaca `Tus bases` como bloque principal de trabajo, junto con accesos rapidos, ideas de arranque y actividad reciente.
+- El dashboard destaca `Tus bases` como bloque principal de trabajo.
 - Al entrar a una base, la vista inicial es `Registros`.
+- `Registros` concentra tabla, filtros avanzados, orden por columnas y acciones por registro.
 - `Trabajo diario` concentra lo importante del dia.
-- `Resumen` muestra estado general y acceso a `Estadisticas`.
-- `Estructura` concentra configuracion de campos, relaciones y columna principal del registro.
-- `Gestion` reune importacion/exportacion y permisos.
+- `Estadisticas` muestra resumen, lectura operativa, analisis por campo e interpretacion.
+- `Estructura` concentra configuracion de campos, relaciones, duplicado y orden visual.
+- `Gestion` reune importacion/exportacion, permisos y acciones sensibles.
 - `Historial` concentra trazabilidad y detalle de movimientos.
 
 ## Cobertura actual de tests
@@ -378,7 +298,7 @@ La suite automatizada cubre flujos centrales del MVP, incluyendo:
 
 - creacion de bases con wizard,
 - persistencia del wizard entre pasos,
-- creacion y edicion de registros,
+- creacion, edicion y duplicado de registros,
 - cambio de columna principal del registro,
 - plantillas iniciales,
 - importacion y exportacion CSV,
@@ -386,6 +306,9 @@ La suite automatizada cubre flujos centrales del MVP, incluyendo:
 - relaciones entre bases,
 - relaciones bidireccionales,
 - creacion inline de registros relacionados,
+- busqueda de relaciones por ID y texto,
+- filtros avanzados y orden de registros,
+- reordenamiento y duplicado de campos,
 - historial de movimientos,
 - detalle de cambios antes / despues en edicion de registros,
 - restricciones de acceso en relaciones,
@@ -393,35 +316,26 @@ La suite automatizada cubre flujos centrales del MVP, incluyendo:
 - bloqueo de cambios destructivos,
 - eliminacion protegida de bases.
 
-## Criterios de calidad ya validados
-
-Actualmente el proyecto pasa:
-
-- `python manage.py test`
-- `python manage.py check`
-- `python manage.py check --deploy`
-
 ## Limitaciones actuales
 
 El producto todavia no incluye:
 
 - automatizaciones complejas,
-- dashboards avanzados,
-- reportes ejecutivos,
+- dashboards avanzados multiwidget,
+- reportes ejecutivos exportables,
 - formularios publicos,
 - billing,
-- auditoria detallada de cambios,
+- auditoria detallada por registro a nivel fino,
 - permisos por campo o por accion fina,
-- organizaciones/workspaces de nivel enterprise,
-- estadisticas funcionales dentro de la vista `Estadisticas` (por ahora es una pantalla informativa).
+- organizaciones/workspaces de nivel enterprise.
 
 ## Roadmap recomendado
 
 Siguientes pasos naturales:
 
-1. Introducir `workspace` u `organization` como frontera SaaS explicita.
-2. Agregar auditoria e historial de cambios.
-3. Mejorar importacion con reporte descargable de errores.
-4. Sumar estadisticas reales por campos.
-5. Incorporar automatizaciones simples.
-6. Avanzar hacia onboarding asistido mas inteligente.
+1. profundizar filtros y microacciones de uso diario,
+2. madurar el modulo de estadisticas y comparacion,
+3. sumar permisos y colaboracion mas finos,
+4. introducir `workspace` u `organization` como frontera SaaS explicita,
+5. incorporar automatizaciones simples,
+6. avanzar hacia onboarding asistido mas inteligente.

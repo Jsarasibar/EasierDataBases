@@ -2,6 +2,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 import json
 
 from .forms import CustomFieldForm
@@ -928,7 +929,8 @@ class DatabaseFlowTests(TestCase):
         response = self.client.get(reverse("database_detail", args=[database.slug]), {"tab": "records", "record_id": str(record_one.pk)})
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "<th>ID</th>", html=False)
+        self.assertContains(response, "table-sort-link")
+        self.assertContains(response, "sort=id")
         self.assertContains(response, f">{record_one.pk}</td>", html=False)
         self.assertContains(response, "Primer registro")
         self.assertNotContains(response, "Segundo registro")
@@ -1465,3 +1467,390 @@ class DatabaseFlowTests(TestCase):
         self.assertEqual(database.name, "Base renombrada")
         self.assertEqual(database.slug, "base-renombrada")
         self.assertIn("/bases/base-renombrada/?tab=manage", response.url)
+
+    def test_field_move_changes_visual_order(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base orden", slug="base-orden", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        first = CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+        )
+        second = CustomField.objects.create(
+            database=database,
+            label="Stock",
+            key="stock",
+            field_type=CustomField.FieldType.NUMBER,
+            position=2,
+        )
+
+        response = self.client.post(reverse("field_move", args=[database.slug, second.pk, "up"]))
+
+        self.assertEqual(response.status_code, 302)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        ordered_labels = list(database.fields.order_by("position", "id").values_list("label", flat=True))
+        self.assertEqual(ordered_labels, ["Stock", "Nombre"])
+
+    def test_field_move_returns_json_for_ajax_request(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base ajax", slug="base-ajax", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        first = CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+        )
+        second = CustomField.objects.create(
+            database=database,
+            label="Stock",
+            key="stock",
+            field_type=CustomField.FieldType.NUMBER,
+            position=2,
+        )
+
+        response = self.client.post(
+            reverse("field_move", args=[database.slug, second.pk, "up"]),
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["ordered_ids"], [second.pk, first.pk])
+
+    def test_record_duplicate_creates_copy(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base dup", slug="base-dup", created_by=self.user, has_priority=True)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+        )
+        record = Record.objects.create(
+            database=database,
+            title="Cafe",
+            priority=Record.Priority.HIGH,
+            data={"nombre": "Cafe"},
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        response = self.client.post(reverse("record_duplicate", args=[database.slug, record.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(database.records.count(), 2)
+        duplicate = database.records.exclude(pk=record.pk).get()
+        self.assertEqual(duplicate.priority, Record.Priority.HIGH)
+        self.assertEqual(duplicate.data["nombre"], "Copia de Cafe")
+        self.assertEqual(duplicate.title, "Copia de Cafe")
+
+    def test_record_archive_moves_record_out_of_active_list(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base archive", slug="base-archive", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+        )
+        record = Record.objects.create(
+            database=database,
+            title="Cafe",
+            data={"nombre": "Cafe"},
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        response = self.client.post(reverse("record_archive", args=[database.slug, record.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        record.refresh_from_db()
+        self.assertIsNotNone(record.archived_at)
+        self.assertEqual(record.archived_by, self.user)
+        active_response = self.client.get(reverse("database_detail", args=[database.slug]), {"tab": "records"})
+        self.assertNotContains(active_response, "Cafe")
+        archived_response = self.client.get(reverse("database_detail", args=[database.slug]), {"tab": "records", "archived": "1"})
+        self.assertContains(archived_response, "Cafe")
+
+    def test_record_delete_removes_record_permanently(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base delete", slug="base-delete", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+        )
+        record = Record.objects.create(
+            database=database,
+            title="Borrar",
+            data={"nombre": "Borrar"},
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        response = self.client.post(reverse("record_delete", args=[database.slug, record.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Record.objects.filter(pk=record.pk).exists())
+
+    def test_record_restore_returns_archived_record_to_active_list(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base restore", slug="base-restore", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+        )
+        record = Record.objects.create(
+            database=database,
+            title="Archivado",
+            data={"nombre": "Archivado"},
+            created_by=self.user,
+            updated_by=self.user,
+            archived_at=timezone.now(),
+            archived_by=self.user,
+        )
+
+        response = self.client.post(reverse("record_restore", args=[database.slug, record.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        record.refresh_from_db()
+        self.assertIsNone(record.archived_at)
+        self.assertIsNone(record.archived_by)
+
+    def test_manage_archived_actions_can_restore_all(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base archived manage", slug="base-archived-manage", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+        )
+        Record.objects.create(
+            database=database,
+            title="Uno",
+            data={"nombre": "Uno"},
+            created_by=self.user,
+            updated_by=self.user,
+            archived_at=timezone.now(),
+            archived_by=self.user,
+        )
+        Record.objects.create(
+            database=database,
+            title="Dos",
+            data={"nombre": "Dos"},
+            created_by=self.user,
+            updated_by=self.user,
+            archived_at=timezone.now(),
+            archived_by=self.user,
+        )
+
+        response = self.client.post(reverse("records_restore_all", args=[database.slug]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(database.records.filter(archived_at__isnull=False).count(), 0)
+
+    def test_manage_archived_actions_can_delete_all(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base archived delete all", slug="base-archived-delete-all", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+        )
+        Record.objects.create(
+            database=database,
+            title="Viejo",
+            data={"nombre": "Viejo"},
+            created_by=self.user,
+            updated_by=self.user,
+            archived_at=timezone.now(),
+            archived_by=self.user,
+        )
+
+        response = self.client.post(reverse("records_delete_all", args=[database.slug]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(database.records.count(), 0)
+
+    def test_records_table_supports_sort_by_clickable_field(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base sort", slug="base-sort", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+            show_in_table=True,
+        )
+        Record.objects.create(database=database, title="Beta", data={"nombre": "Beta"}, created_by=self.user, updated_by=self.user)
+        Record.objects.create(database=database, title="Alfa", data={"nombre": "Alfa"}, created_by=self.user, updated_by=self.user)
+
+        response = self.client.get(
+            reverse("database_detail", args=[database.slug]),
+            {"tab": "records", "sort": "title", "direction": "asc"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        records = list(response.context["records"])
+        self.assertEqual([record.title for record in records], ["Alfa", "Beta"])
+
+    def test_relation_search_returns_matching_results(self):
+        self.client.login(username="admin", password="secret123")
+        customers = AppDatabase.objects.create(name="Clientes", slug="clientes-search", created_by=self.user)
+        orders = AppDatabase.objects.create(name="Pedidos", slug="pedidos-search", created_by=self.user)
+        DatabaseMembership.objects.create(database=customers, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        DatabaseMembership.objects.create(database=orders, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        customer_name = CustomField.objects.create(
+            database=customers,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+        )
+        relation_field = CustomField.objects.create(
+            database=orders,
+            label="Cliente",
+            key="cliente",
+            field_type=CustomField.FieldType.RELATION,
+            relation_database=customers,
+            position=1,
+            is_primary=True,
+        )
+        record = Record.objects.create(
+            database=customers,
+            title="Juan Perez",
+            data={customer_name.key: "Juan Perez"},
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        response = self.client.get(
+            reverse("relation_record_search", args=[orders.slug, relation_field.pk]),
+            {"q": "Juan"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["results"][0]["id"], record.pk)
+        self.assertIn("Juan Perez", payload["results"][0]["label"])
+
+    def test_record_priority_update_changes_priority(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base prioridades", slug="base-prioridades", created_by=self.user, has_priority=True)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+        )
+        record = Record.objects.create(
+            database=database,
+            title="Cafe",
+            priority=Record.Priority.NORMAL,
+            data={"nombre": "Cafe"},
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("record_priority_update", args=[database.slug, record.pk]),
+            {"priority": Record.Priority.URGENT, "view": "table", "sort": "updated", "direction": "desc"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        record.refresh_from_db()
+        self.assertEqual(record.priority, Record.Priority.URGENT)
+
+    def test_field_duplicate_creates_new_copy(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base campos", slug="base-campos", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        field = CustomField.objects.create(
+            database=database,
+            label="Estado",
+            key="estado",
+            field_type=CustomField.FieldType.SELECT,
+            options_text="Pendiente\nHecho",
+            position=1,
+            is_primary=True,
+        )
+
+        response = self.client.post(reverse("field_duplicate", args=[database.slug, field.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(database.fields.count(), 2)
+        duplicate = database.fields.exclude(pk=field.pk).get()
+        self.assertEqual(duplicate.label, "Estado (copia)")
+        self.assertEqual(duplicate.options_text, field.options_text)
+
+    def test_advanced_record_filter_by_select_field(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Base filtros avanzados", slug="base-filtros-avanzados", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            position=1,
+            is_primary=True,
+            show_in_table=True,
+        )
+        category_field = CustomField.objects.create(
+            database=database,
+            label="Categoria",
+            key="categoria",
+            field_type=CustomField.FieldType.SELECT,
+            options_text="Bebidas\nAccesorios",
+            position=2,
+            show_in_table=True,
+        )
+        Record.objects.create(database=database, title="Cafe", data={"nombre": "Cafe", "categoria": "Bebidas"}, created_by=self.user, updated_by=self.user)
+        Record.objects.create(database=database, title="Taza", data={"nombre": "Taza", "categoria": "Accesorios"}, created_by=self.user, updated_by=self.user)
+
+        response = self.client.get(
+            reverse("database_detail", args=[database.slug]),
+            {"tab": "records", f"field_{category_field.key}": "Bebidas"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        records = list(response.context["records"])
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].title, "Cafe")
