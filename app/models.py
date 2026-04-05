@@ -77,6 +77,7 @@ class DatabaseMembership(models.Model):
 class CustomField(models.Model):
     class FieldType(models.TextChoices):
         TEXT = "text", "Texto"
+        DESCRIPTION = "description", "Descripcion"
         NUMBER = "number", "Numero"
         CURRENCY = "currency", "Moneda"
         BOOLEAN = "boolean", "Si / No"

@@ -1,87 +1,75 @@
-# Manual Tecnico de EasierDataBases
+# Manual tecnico de EasierDataBases
 
-## 1. Objetivo del documento
+## 1. Objetivo
 
-Este manual tecnico describe como funciona EasierDataBases a nivel funcional y tecnico.
+Este documento explica como funciona EasierDataBases a nivel tecnico y funcional.
 
-La idea es que cualquier persona que tome el proyecto pueda entender:
+Sirve para entender:
 
-- que resuelve el sistema,
-- como esta organizado,
-- cuales son sus entidades principales,
-- como es el flujo interno de cada modulo,
-- como se relacionan frontend, vistas, formularios y modelos,
-- y que comportamiento esperar en cada seccion del producto.
+- arquitectura general,
+- entidades del dominio,
+- flujo interno del producto,
+- organizacion de vistas y templates,
+- y comportamiento actual de cada modulo.
 
-## 2. Vision general del producto
+## 2. Vision general
 
-EasierDataBases es una plataforma no-code construida con Django para crear y operar bases de datos simples desde una interfaz visual.
+EasierDataBases es una plataforma no-code basada en Django para crear y operar bases de datos simples desde una interfaz visual.
 
-Hoy el producto permite:
+La unidad central del sistema es `AppDatabase`: una base creada por un usuario, con sus campos, registros, miembros, estadisticas e historial.
 
-- crear bases desde cero o con plantillas,
-- definir campos personalizados,
-- cargar, editar, duplicar y eliminar registros,
-- relacionar bases entre si,
-- importar y exportar CSV,
-- analizar datos con estadisticas,
-- trabajar con usuarios y roles basicos,
-- y mantener un historial de actividad por base.
+## 3. Stack
 
-## 3. Stack tecnologico
-
-- Python
+- Python 3.14
 - Django 6
 - SQLite para desarrollo local
-- PostgreSQL soportado mediante `DATABASE_URL`
-- templates server-rendered de Django
+- PostgreSQL soportado por `DATABASE_URL`
+- Templates server-rendered de Django
 - CSS propio
 - JavaScript liviano embebido en templates
 
-## 4. Estructura general del proyecto
+## 4. Estructura del proyecto
 
-- `config/`: configuracion del proyecto
-- `app/`: dominio principal, modelos, vistas, formularios, urls y tests
-- `templates/`: interfaz HTML
-- `static/`: estilos y assets
-- `tmp/`: archivos temporales de soporte
+- `config/`
+  - settings, urls y configuracion global
+- `app/`
+  - modelos, formularios, vistas, urls y tests
+- `templates/`
+  - UI server-rendered
+- `static/`
+  - estilos y assets
+- `tmp/`
+  - uploads temporales, especialmente para importacion CSV
 
-## 5. Arquitectura conceptual
-
-La aplicacion se apoya sobre una idea central:
-
-> una base creada por un usuario tiene su propia estructura y sus propios registros.
-
-Cada base define:
-
-- nombre y slug,
-- si usa prioridad o no,
-- sus campos,
-- sus miembros,
-- sus registros,
-- sus estadisticas guardadas,
-- y su historial.
-
-## 6. Entidades principales del dominio
+## 5. Modelos principales
 
 ### `AppDatabase`
 
-Representa una base creada por un usuario.
+Representa una base creada por el usuario.
+
+Responsabilidades:
+
+- nombre, slug y descripcion
+- use case
+- configuracion general
+- relacion con campos, registros, miembros, historial y estadisticas guardadas
 
 ### `DatabaseMembership`
 
-Define acceso y rol sobre cada base.
+Relacion usuario-base.
 
 Roles actuales:
 
 - `admin`
 - `editor`
 
+Se usa para aislamiento funcional y permisos dentro de cada base.
+
 ### `CustomField`
 
-Representa un campo configurable dentro de una base.
+Modela un campo configurable dentro de una base.
 
-Propiedades relevantes:
+Campos relevantes:
 
 - `label`
 - `key`
@@ -94,78 +82,102 @@ Propiedades relevantes:
 - `relation_database`
 - `position`
 
-Reglas importantes:
+Reglas clave:
 
-- `key` no cambia despues de creado el campo
-- `position` define el orden visual del campo
-- si un campo ya tiene datos, no se permiten cambios destructivos
-- si un campo relacion ya tiene datos, no se puede cambiar la base relacionada
+- `key` se genera una sola vez y luego queda estable
+- `position` define el orden visual
+- si ya hay datos cargados, se restringen cambios destructivos
+- si es un campo de relacion con datos, no se puede cambiar su base destino
 
 ### `Record`
 
 Representa un registro dentro de una base.
 
-Caracteristicas:
+Campos relevantes:
 
-- pertenece a una base
-- guarda sus datos en un `JSONField`
-- puede tener prioridad si la base la usa
-- mantiene un `title` sincronizado con el campo principal
+- `database`
+- `title`
+- `priority`
+- `data`
+- `created_by`
+- `updated_by`
+- `archived_at`
+- `archived_by`
+
+Notas:
+
+- los datos variables viven en `JSONField`
+- `title` se sincroniza con el campo principal de la base
+- el archivado es logico, no fisico
 
 ### `DatabaseActivity`
 
-Representa un movimiento de historial dentro de una base.
+Historial por base.
+
+Guarda:
+
+- accion
+- detalle
+- usuario
+- fecha
+- payload enriquecido
 
 ### `SavedStatistic`
 
-Permite guardar configuraciones de analisis estadistico por base.
+Guarda configuraciones reutilizables de analisis por base.
 
-## 7. Flujo general del sistema
+## 6. Flujo general del producto
 
 1. el usuario se registra o inicia sesion
 2. entra al dashboard
-3. crea una nueva base o abre una existente
-4. define la estructura inicial mediante el asistente o el editor
+3. crea una base o abre una existente
+4. configura estructura
 5. carga registros manualmente o por CSV
-6. opera sobre esos registros desde `Registros` o `Trabajo diario`
-7. consulta `Estadisticas`
-8. administra miembros, importaciones, exportaciones y cambios desde `Gestion`
-9. revisa trazabilidad desde `Historial`
+6. opera desde `Registros` o `Trabajo diario`
+7. analiza en `Estadisticas`
+8. gestiona miembros, importaciones y archivados desde `Gestion`
+9. revisa trazabilidad en `Historial`
 
-## 8. Dashboard
+## 7. Dashboard
 
-El dashboard es el centro de entrada al producto.
+El dashboard actual esta organizado para priorizar `Tus bases`.
 
-Secciones actuales:
+Secciones:
 
-- accesos rapidos
-- tus bases
-- ideas para empezar
-- actividad reciente
+- `Tus bases`
+- `Accesos rapidos`
+- `Resumen rapido`
+- `Ideas para empezar`
+- `Actividad reciente`
 
-`Tus bases` es la seccion principal.
+## 8. Flujo de creacion de bases
 
-## 9. Flujo de creacion de una base
-
-La creacion de bases se hace mediante un asistente multi-paso:
+La creacion se hace con un asistente de 4 pasos:
 
 1. elegir plantilla
-2. definir nombre y descripcion
+2. poner nombre
 3. completar estructura inicial
 4. confirmar
 
-Al confirmar:
+En el paso 3 se pueden:
 
-- se crea la base
-- se crean los campos
-- se marca el primer campo como principal si corresponde
-- se crean registros demo si aplica
-- se crea membresia admin para el creador
-- se registra actividad en historial
+- activar o desactivar campos base
+- sumar extras
+- activar prioridad
+- agregar campos propios
 
-## 10. Organizacion interna de una base
+Al confirmar se crean:
 
-Orden actual de pestanas:
+- la base
+- los campos
+- el campo principal si corresponde
+- registros demo opcionales
+- la membresia admin del creador
+- actividad inicial en historial
+
+## 9. Organizacion interna de una base
+
+Cada base se estructura en estas pestanas:
 
 - `Registros`
 - `Trabajo diario`
@@ -174,251 +186,278 @@ Orden actual de pestanas:
 - `Gestion`
 - `Historial`
 
-### `Registros`
+## 10. `Registros`
 
-Es la vista principal de trabajo.
+Es la vista principal de operacion.
 
-Muestra:
+### Capacidades actuales
 
-- tabla o tarjetas
-- busqueda libre
-- filtro por ID
-- filtros avanzados dinamicos
-- ordenamiento por columnas
+- tabla y tarjetas
+- busqueda unificada por ID, nombre o contenido
+- orden por columnas
+- filtros avanzados por tipo de campo
 - paginacion
 - menu `...` por registro
 
-Caracteristicas clave:
+### Menu `...`
 
-- encabezados clickeables con toggle ascendente / descendente
-- acciones por registro:
-  - duplicar
-  - editar
-  - eliminar
-  - cambiar prioridad rapidamente
-- preservacion de filtros y posicion vertical tras submits
+Acciones actuales:
 
-### `Trabajo diario`
+- editar
+- duplicar
+- archivar
+- eliminar definitivamente
 
-Vista operativa mas liviana para concentrar accesos y trabajo inmediato.
+`Eliminar` ya no usa `confirm()` del navegador: abre un modal propio de la aplicacion.
 
-### `Estadisticas`
+### Orden por columnas
 
-Modulo analitico de la base.
+Los encabezados son clickeables.
 
-Estructura interna actual:
+El sistema soporta orden para:
+
+- `id`
+- `title`
+- `priority`
+- y campos compatibles de `CustomField`
+
+### Scroll restore
+
+La app guarda y restaura `scrollY` al hacer submit o al ordenar en bases abiertas.
+
+La logica vive en `templates/base.html`.
+
+## 11. `Trabajo diario`
+
+Es una vista mas reducida y operativa.
+
+Busca concentrar:
+
+- foco del dia
+- acciones rapidas
+- continuidad de trabajo
+
+## 12. `Estadisticas`
+
+### Estructura actual
 
 1. resumen automatico
 2. estadisticas utiles para operar
 3. workspace principal:
    - constructor
-   - grafico o resultado
+   - resultado / grafico
    - interpretacion
 4. comparacion
 5. estadisticas guardadas
 
-### `Estructura`
+### Capacidades
+
+- analisis por campo
+- tipos de visualizacion por tipo de dato
+- filtros avanzados
+- comparacion basica entre periodos
+- interpretacion textual
+- vista ampliada del grafico
+
+### Tipos de visualizacion
+
+- barras
+- torta
+- tabla
+- metricas
+
+### Persistencia
+
+Las estadisticas guardadas se almacenan en `SavedStatistic`.
+
+## 13. `Estructura`
 
 Editor visual de la base.
 
+### Permite
+
+- crear campos
+- editar campos
+- duplicar campos
+- moverlos arriba y abajo
+- definir relaciones
+- marcar obligatoriedad
+- controlar visibilidad en tabla
+- configurar ayuda
+- elegir el campo principal del registro
+
+### Reordenamiento
+
+Se resuelve con `position` en `CustomField` y acciones `field_move`.
+
+El reordenamiento actual no recarga toda la pagina: se maneja con fetch + DOM update.
+
+## 14. `Gestion`
+
+Hoy esta ordenada asi:
+
+1. `Datos y operaciones`
+2. `Equipo y permisos`
+3. `Archivados`
+4. `Zona sensible`
+
+### Importacion CSV
+
+Flujo actual:
+
+1. subir archivo
+2. revisar y mapear columnas
+
+Detalles:
+
+- el archivo se guarda temporalmente
+- se inspecciona para detectar encabezados y preview
+- el mapeo se resuelve en una pantalla separada
+- luego se procesa el archivo completo
+
+### Archivados
+
+Se gestionan desde `Gestion > Archivados`.
+
 Permite:
 
-- crear, editar y duplicar campos
-- moverlos arriba o abajo
-- definir relaciones
-- elegir si se muestran en tabla
-- elegir obligatoriedad
-- ajustar ayuda
-- definir que columna es el nombre visible del registro
+- restaurar un registro archivado
+- eliminarlo definitivamente
+- restaurar todos
+- eliminar todos
 
-### `Gestion`
+## 15. Relaciones entre bases
 
-Incluye:
+### Definicion
 
-- importacion CSV
-- exportacion CSV
-- miembros y roles
-- cambio de nombre de base
-- eliminacion segura de base
-
-### `Historial`
-
-Muestra:
-
-- accion
-- detalle
-- usuario
-- fecha
-- payload enriquecido
-- comparacion `antes / ahora` si hubo cambios
-
-## 11. Flujo de registros
-
-### Creacion y edicion
-
-La pantalla de alta y edicion se construye dinamicamente segun los `CustomField` de la base.
-
-El formulario:
-
-- construye widgets segun tipo
-- agrega selector de prioridad si aplica
-- valida formatos especificos
-- valida relaciones permitidas
-
-Si el campo es de relacion, el formulario agrega una caja de busqueda para encontrar registros por ID o texto y mantiene la opcion de alta inline.
-
-### Duplicado
-
-Existe una accion dedicada de duplicado.
-
-Comportamiento:
-
-- copia `data`
-- copia prioridad si aplica
-- regenera PK y timestamps
-- si el campo principal es textual, prefija `Copia de ...`
-- registra actividad en historial
-
-### Campo principal del registro
-
-Cada base puede elegir que `CustomField` es el principal.
-
-Ese campo:
-
-- define el nombre visible del registro
-- se usa en tablas, tarjetas, previews y relaciones
-
-## 12. Relaciones entre bases
-
-Las relaciones se modelan mediante `CustomField` de tipo `relation`.
-
-Internamente:
-
-- en `Record.data` se guarda el ID del registro relacionado
-- no se usa una columna FK fija en SQL por cada relacion
-
-### Busqueda en relaciones
-
-El formulario de registros aporta:
-
-- filtro local de opciones del select
-- busqueda por ID o texto
-- endpoint de apoyo para coincidencias remotas
+Se crean mediante `CustomField` de tipo `relation`.
 
 ### Restricciones
 
-- solo se muestran bases visibles para el usuario
-- solo se permiten registros relacionados de bases accesibles
-- el backend valida que no se puedan forzar IDs ajenos
+- solo se pueden relacionar bases visibles para el usuario
+- se valida backend ante envios manipulados
 
-## 13. Importacion y exportacion CSV
+### Uso en formularios
+
+Los campos de relacion hoy soportan:
+
+- busqueda/autocomplete por ID o texto
+- alta inline de un registro relacionado
+
+### Visualizacion
+
+- navegacion bidireccional
+- preview contextual de registros relacionados
+- detalle del registro relacionado
+
+## 16. CSV
 
 ### Importacion
 
-Pasos:
+Se apoya en:
 
-1. upload del archivo
-2. lectura segura temporal
-3. preview de encabezados y filas
-4. pantalla de mapeo de columnas
-5. procesamiento completo
-6. resumen final
+- `CSVImportForm`
+- `CSVMappingForm`
+- vistas `records_import_start` y `records_import_map`
 
 ### Exportacion
 
-La exportacion:
+Genera CSV server-side desde la base actual.
 
-- genera CSV de la base actual
-- usa nombres visibles de campos
-- resuelve relaciones con su valor visible
+## 17. Archivado y borrado
 
-## 14. Historial y trazabilidad
+### Archivado
 
-Eventos que hoy generan historial:
+`record_archive` marca:
 
-- creacion de base
-- renombre de base
-- creacion, edicion, duplicado y eliminacion de registros
-- alta, edicion, duplicado, movimiento y baja de campos
-- cambio del campo principal
-- importaciones y exportaciones
-- cambios de membresia
-- cambios rapidos de prioridad
+- `archived_at`
+- `archived_by`
 
-## 15. Frontend y comportamiento visual
+El registro deja de aparecer en el queryset activo.
 
-La aplicacion esta renderizada del lado servidor.
+### Restauracion
 
-Interacciones JS actuales mas relevantes:
+`record_restore` limpia esos campos.
 
-- cambio de tema claro / oscuro
-- restauracion de scroll al enviar formularios dentro de bases
-- modales de preview
-- apertura de historiales
-- apertura de relaciones
-- selector dinamico de tipos de grafico
-- mostrar/ocultar comparacion manual
-- expansion del grafico de estadisticas
-- cierre de menus `...`
-- filtrado de relaciones en formularios
+### Borrado definitivo
 
-## 16. Sistema de estadisticas en detalle
+`record_delete` elimina el registro fisicamente.
 
-La seccion de estadisticas trabaja sobre:
+Se usa:
 
-- la base actual
-- los registros visibles para el usuario
-- filtros seleccionados
-- el campo elegido
+- desde `Registros`
+- y desde `Gestion > Archivados`
 
-Segun el tipo de campo:
+## 18. Historial
 
-- un campo categorico muestra barras, torta o tabla
-- un campo numerico muestra metricas o tabla
+El historial registra movimientos como:
 
-La comparacion permite:
+- creacion de bases
+- cambios de estructura
+- carga y edicion de registros
+- importacion/exportacion
+- restauracion y archivado
+- eliminacion definitiva
 
-- comparar contra 7 dias previos
-- comparar contra 30 dias previos
-- comparar manualmente con otro rango
+Cuando corresponde, el payload guarda:
 
-## 17. Seguridad y controles de integridad
+- resumen
+- cambios `antes / ahora`
+- detalles adicionales
 
-- `CustomField.key` estable
-- cambios de tipo restringidos si hay datos
-- cambio de base relacionada bloqueado si ya hay datos
-- borrado de campo bloqueado si tiene datos
-- sincronizacion de `title` cuando cambia el campo principal
-- autenticacion Django
-- membresia por base
-- validacion backend de IDs relacionados
+## 19. Seguridad e integridad
 
-## 18. Tests y calidad actual
+### Ya implementado
 
-Los tests actuales cubren principalmente:
+- key estable en campos
+- validacion de cambios inseguros
+- validacion de relaciones
+- bloqueo de eliminacion de campos con datos
+- aislamiento por membresia
+- configuracion por entorno
+- soporte para hardening de produccion
 
-- autenticacion
-- creacion de base
-- plantillas
+## 20. Frontend y estilo
+
+### Render
+
+La UI es server-rendered con templates Django.
+
+### CSS
+
+La mayor parte vive en `static/styles/app.css`.
+
+### JS
+
+Se usa JS embebido y liviano para:
+
+- modales
+- expanders inline
+- restauracion de scroll
+- menus flotantes
+- importacion CSV
+- acciones contextuales
+
+### Temas
+
+- modo claro
+- modo oscuro persistente
+
+## 21. Tests
+
+La suite cubre actualmente:
+
+- creacion de bases
 - relaciones
 - importacion CSV
-- restricciones de permisos
-- historial
-- estadisticas
-- cambios de estructura
-- reordenamiento de campos
+- orden por columnas
 - duplicado de registros
-- orden y filtros avanzados
+- restauracion y eliminacion de archivados
+- estadisticas
+- y distintos flujos criticos de UI/backend
 
-## 19. Archivos tecnicos mas importantes
+Ejecucion:
 
-- `C:\Users\mergo\Desktop\Archivos\Proyectos\EasierDataBases\config\settings.py`
-- `C:\Users\mergo\Desktop\Archivos\Proyectos\EasierDataBases\app\models.py`
-- `C:\Users\mergo\Desktop\Archivos\Proyectos\EasierDataBases\app\views.py`
-- `C:\Users\mergo\Desktop\Archivos\Proyectos\EasierDataBases\app\forms.py`
-- `C:\Users\mergo\Desktop\Archivos\Proyectos\EasierDataBases\app\urls.py`
-- `C:\Users\mergo\Desktop\Archivos\Proyectos\EasierDataBases\app\tests.py`
-- `C:\Users\mergo\Desktop\Archivos\Proyectos\EasierDataBases\templates\base.html`
-- `C:\Users\mergo\Desktop\Archivos\Proyectos\EasierDataBases\templates\database_detail.html`
-- `C:\Users\mergo\Desktop\Archivos\Proyectos\EasierDataBases\templates\record_form.html`
-- `C:\Users\mergo\Desktop\Archivos\Proyectos\EasierDataBases\static\styles\app.css`
+```powershell
+.\.venv\Scripts\python manage.py test
+```

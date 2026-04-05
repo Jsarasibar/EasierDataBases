@@ -879,6 +879,76 @@ class DatabaseFlowTests(TestCase):
         self.assertContains(response, "Acme SA")
         self.assertContains(response, "relation-previews-data")
 
+    def test_records_view_renders_description_as_preview_action(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Articulos", slug="articulos-preview", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Nombre",
+            key="nombre",
+            field_type=CustomField.FieldType.TEXT,
+            required=True,
+            position=1,
+            is_primary=True,
+            show_in_table=True,
+        )
+        description_field = CustomField.objects.create(
+            database=database,
+            label="Descripcion",
+            key="descripcion",
+            field_type=CustomField.FieldType.DESCRIPTION,
+            required=False,
+            position=2,
+            show_in_table=True,
+        )
+        Record.objects.create(
+            database=database,
+            title="Cafe de especialidad",
+            data={
+                "nombre": "Cafe de especialidad",
+                description_field.key: "Notas largas de tostado y origen para leer completas.",
+            },
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        response = self.client.get(reverse("database_detail", args=[database.slug]), {"tab": "records"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Leer descripcion")
+        self.assertContains(response, "description-previews-data")
+        self.assertContains(response, "Cafe de especialidad")
+        self.assertContains(response, "Notas largas de tostado y origen para leer completas.")
+
+    def test_description_field_uses_textarea_in_record_form(self):
+        self.client.login(username="admin", password="secret123")
+        database = AppDatabase.objects.create(name="Tareas", slug="tareas-descripcion", created_by=self.user)
+        DatabaseMembership.objects.create(database=database, user=self.user, role=DatabaseMembership.Role.ADMIN)
+        CustomField.objects.create(
+            database=database,
+            label="Titulo",
+            key="titulo",
+            field_type=CustomField.FieldType.TEXT,
+            required=True,
+            position=1,
+            is_primary=True,
+        )
+        CustomField.objects.create(
+            database=database,
+            label="Descripcion",
+            key="descripcion",
+            field_type=CustomField.FieldType.DESCRIPTION,
+            required=False,
+            position=2,
+        )
+
+        response = self.client.get(reverse("record_create", args=[database.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="descripcion"', html=False)
+        self.assertContains(response, "<textarea", html=False)
+
     def test_database_tabs_render_specific_sections(self):
         self.client.login(username="admin", password="secret123")
         database = AppDatabase.objects.create(name="Operaciones", slug="operaciones", created_by=self.user)

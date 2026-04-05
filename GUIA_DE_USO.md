@@ -1,41 +1,38 @@
-# Guia paso a paso para crear y gestionar tu base de datos con EasierDataBases
+# Guia de uso de EasierDataBases
 
-Esta guia esta pensada para usuarios que quieren empezar a trabajar con EasierDataBases sin conocimientos tecnicos.
+Esta guia explica, paso a paso, como usar EasierDataBases desde el punto de vista de un usuario final.
 
-El objetivo es mostrar, paso a paso, como crear una base, personalizarla, cargar informacion y usarla en el trabajo diario.
+## 1. Entrar al sistema
 
-## 1. Ingresar al sistema
+Al abrir EasierDataBases puedes:
 
-Cuando abras EasierDataBases vas a poder:
-
-- crear una cuenta nueva,
+- crear una cuenta,
 - ingresar con una cuenta existente,
-- o recuperar tu contrasena si la olvidaste.
+- o recuperar tu contrasena.
 
 ## 2. Entender el dashboard
 
 El dashboard es tu punto de partida.
 
-Hoy muestra:
+Hoy esta organizado asi:
 
-- `Accesos rapidos`
 - `Tus bases`
+- `Accesos rapidos`
+- `Resumen rapido`
 - `Ideas para empezar`
 - `Actividad reciente`
 
-`Tus bases` es la seccion principal del dashboard y el punto mas importante del producto.
+La seccion principal es `Tus bases`.
 
-## 3. Crear una nueva base
-
-Desde el dashboard:
+## 3. Crear una base
 
 1. Haz clic en `Nueva base`.
 2. Se abrira el asistente de creacion.
 
-El asistente te guia en 4 pasos:
+El asistente tiene 4 pasos:
 
 1. elegir plantilla
-2. ponerle nombre
+2. poner nombre
 3. completar estructura inicial
 4. confirmar
 
@@ -46,9 +43,9 @@ En el paso 3 puedes:
 - activar `Prioridad`,
 - y agregar campos propios.
 
-## 4. Entender la pantalla de una base
+## 4. Abrir una base
 
-Cuando entras a una base, veras estas pestanas:
+Cuando entras a una base veras estas pestanas:
 
 - `Registros`
 - `Trabajo diario`
@@ -57,232 +54,243 @@ Cuando entras a una base, veras estas pestanas:
 - `Gestion`
 - `Historial`
 
+La vista que se abre por defecto es `Registros`.
+
 ## 5. Trabajar en `Registros`
 
-Es la vista principal y la que se abre por defecto.
+Es la seccion principal para operar datos.
 
 Aqui puedes:
 
-- ver la tabla de datos,
-- cambiar a vista de tarjetas,
-- buscar por nombre, contenido o ID,
-- ordenar tocando el nombre de una columna,
-- aplicar filtros avanzados,
-- abrir el menu `...` de cada registro,
-- y agregar nuevos registros.
+- ver registros en tabla o tarjetas,
+- buscar por ID, nombre o contenido,
+- ordenar por columnas,
+- filtrar,
+- crear registros,
+- editar,
+- duplicar,
+- archivar,
+- o eliminar definitivamente.
 
-### Ordenar por columnas
+### Busqueda
 
-Toca el encabezado de una columna para ordenar.
+Hay una sola caja de busqueda.
 
-El orden cambia entre:
+Sirve para encontrar:
+
+- un ID exacto,
+- el nombre visible del registro,
+- o cualquier contenido textual disponible.
+
+### Orden por columnas
+
+Haz clic sobre el nombre de una columna para ordenar.
+
+Cada clic alterna entre:
 
 - ascendente
 - descendente
 
 ### Filtros avanzados
 
-En el panel derecho puedes abrir `Filtros avanzados`.
-
-Dependiendo de los campos de la base, podras filtrar por:
+Dependiendo de la base, puedes filtrar por:
 
 - seleccion,
-- si/no,
 - relacion,
-- rango numerico,
-- rango de fechas.
+- si/no,
+- fechas,
+- rangos numericos,
+- prioridad.
 
 ### Menu `...` por registro
 
-Cada registro en tabla o tarjetas tiene un menu de acciones.
+Cada registro tiene un menu de acciones.
+
+Opciones actuales:
+
+- `Editar`
+- `Duplicar`
+- `Archivar`
+- `Eliminar`
+
+`Eliminar` abre una confirmacion propia de la app y elimina el registro definitivamente.
+
+## 6. Crear o editar registros
+
+Para cargar un registro:
+
+1. Ve a `Registros`.
+2. Haz clic en `Agregar registro`.
+3. Completa los campos.
+4. Guarda.
+
+El nombre visible del registro no es fijo: depende del campo principal que definas en `Estructura`.
+
+## 7. Archivar y restaurar registros
+
+### Archivar
+
+Desde `Registros`, abre el menu `...` y elige `Archivar`.
+
+El registro deja de verse en la base activa, pero no se pierde.
+
+### Gestionar archivados
+
+1. Ve a `Gestion`.
+2. Abre la tarjeta `Archivados`.
 
 Desde ahi puedes:
 
-- `Duplicar`
-- `Editar`
-- `Eliminar`
-- cambiar prioridad rapidamente si la base usa prioridad
+- restaurar un registro,
+- eliminarlo definitivamente,
+- restaurar todos,
+- o eliminar todos.
 
-## 6. Crear registros manualmente
+## 8. Entender `Trabajo diario`
 
-Para cargar informacion manualmente:
+`Trabajo diario` es una vista mas liviana pensada para operar rapido.
 
-1. Entra en `Registros`.
-2. Haz clic en `Agregar registro`.
-3. Completa los campos visibles.
-4. Si la base usa prioridad, elige la prioridad.
-5. Guarda el registro.
+Sirve para:
 
-Importante:
+- ver lo importante del dia,
+- entrar a registros prioritarios,
+- y cargar rapido sin navegar tanto.
 
-- el nombre visible del registro sale del campo principal que definas en `Estructura`.
+## 9. Usar `Estadisticas`
 
-## 7. Cambiar la columna principal del registro
+La pestana `Estadisticas` sirve para leer rapidamente que esta pasando en tu base.
 
-Cada base tiene una columna que define el nombre visible de cada registro.
+Hoy incluye:
 
-Para cambiarla:
+- resumen automatico,
+- estadisticas utiles para operar,
+- constructor de estadisticas,
+- grafico o resultado,
+- interpretacion,
+- comparacion,
+- y estadisticas guardadas.
 
-1. Ve a `Estructura`.
-2. En el bloque superior `Registro`, busca `Columna que identifica cada registro`.
-3. Elige otra columna.
-4. Haz clic en `Actualizar columna`.
+### Como usarla
 
-## 8. Editar la estructura de la base
+1. Entra en `Estadisticas`.
+2. Elige un campo en `Constructor de estadisticas`.
+3. Elige el tipo de grafico disponible.
+4. Si quieres, abre `Opciones avanzadas`.
+5. Haz clic en `Analizar`.
+
+Si activas `Comparacion`, puedes comparar con:
+
+- `Sin comparacion`
+- `Ultimos 7 dias previos`
+- `Ultimos 30 dias previos`
+- `Comparacion manual`
+
+## 10. Editar la estructura de una base
 
 En `Estructura` puedes:
 
-- crear campos nuevos,
-- editar campos existentes,
-- duplicar campos,
+- agregar campos,
+- editar campos,
+- duplicarlos,
 - moverlos arriba o abajo,
-- crear relaciones con otras bases,
+- crear relaciones,
+- marcar si son obligatorios,
+- decidir si se ven en la tabla,
 - y cambiar la columna principal del registro.
 
-### Reordenar campos
+### Cambiar el nombre visible del registro
 
-En cada tarjeta de campo puedes usar:
+En la parte superior de `Estructura` veras el bloque `Registro`.
 
-- `Subir`
-- `Bajar`
+Desde ahi puedes elegir que columna representa el nombre visible del registro.
 
-Esto cambia el orden visual en formularios, tabla y detalle.
+## 11. Crear relaciones entre bases
 
-### Duplicar campos
-
-Si necesitas un campo parecido a otro:
-
-1. Ve a la tarjeta del campo.
-2. Haz clic en `Duplicar`.
-
-Se creara un nuevo campo con configuracion similar.
-
-## 9. Relacionar una base con otra
-
-Las relaciones sirven para conectar informacion.
+Las relaciones sirven para conectar informacion entre bases.
 
 Ejemplos:
 
 - pedidos con clientes,
 - alumnos con cursos,
-- tareas con responsables,
 - productos con proveedores.
 
 ### Como crear una relacion
 
 1. Ve a `Estructura`.
-2. Crea un nuevo campo.
+2. Crea un campo nuevo.
 3. Elige tipo `Relacion con otra base`.
 4. Selecciona la base relacionada.
 5. Guarda.
 
-## 10. Buscar dentro de un campo de relacion
+### Como usar una relacion al cargar un registro
 
-Cuando cargas o editas un registro y aparece un campo de relacion:
+Cuando aparece un campo de relacion:
 
-1. Usa la caja de busqueda del campo.
-2. Escribe texto o un ID.
-3. El sistema filtrara los registros disponibles de esa base relacionada.
+- puedes buscar por ID o texto,
+- elegir un registro existente,
+- o crear uno nuevo sin salir del formulario.
 
-## 11. Crear un registro relacionado sin salir del formulario
+## 12. Importar CSV
 
-Si al cargar un registro todavia no existe el elemento relacionado:
+La importacion ahora es guiada en 2 pasos.
 
-1. En el campo de relacion, elige la opcion para agregar un nuevo registro relacionado.
-2. Se abrira un modal dentro de la misma ventana.
-3. Carga el nuevo registro.
-4. Guarda.
-
-Al cerrar el modal, ese nuevo registro quedara seleccionado automaticamente en el formulario original.
-
-## 12. Ver estadisticas
-
-En `Estadisticas` puedes analizar campos de tu base.
-
-### Que ofrece hoy
-
-- resumen automatico,
-- estadisticas utiles para operar,
-- analisis por campo,
-- barras, torta, tabla o metricas,
-- interpretacion textual,
-- comparacion con periodos previos,
-- guardado de estadisticas.
-
-### Como usarla
-
-1. Entra en `Estadisticas`.
-2. En `Constructor de estadisticas`, elige un campo.
-3. Elige el tipo de grafico disponible para ese campo.
-4. Si quieres, abre `Opciones avanzadas`.
-5. Haz clic en `Analizar`.
-
-Si activas `Comparacion`, podras comparar con:
-
-- ultimos 7 dias previos,
-- ultimos 30 dias previos,
-- comparacion manual.
-
-## 13. Importar datos desde CSV
+### Paso 1
 
 1. Ve a `Gestion`.
-2. En `Importacion guiada`, selecciona tu archivo `.csv`.
-3. Indica si el archivo tiene encabezados.
-4. Continua para mapear columnas.
-5. Relaciona cada columna con el dato correcto.
-6. Confirma la importacion.
+2. En `Datos y operaciones`, sube tu archivo CSV.
+3. Indica si tiene encabezados.
+4. Haz clic en `Subir archivo y continuar`.
 
-## 14. Exportar una base a CSV
+### Paso 2
 
-1. Ve a `Gestion`.
-2. Haz clic en `Exportar CSV`.
+1. Revisa la vista previa.
+2. Mapea cada columna del archivo con el dato correcto.
+3. Si una columna no sirve, dejala en `Ignorar`.
+4. Confirma la importacion.
 
-## 15. Compartir la base con otras personas
+## 13. Exportar CSV
 
-Si quieres trabajar con alguien mas:
+En `Gestion > Datos y operaciones`, usa `Exportar CSV`.
 
-1. Ve a `Gestion`.
-2. Busca `Equipo y permisos`.
-3. Escribe el nombre de usuario.
-4. Elige un rol.
-5. Guarda.
+## 14. Gestionar equipo y permisos
 
-Roles disponibles:
+En `Gestion > Equipo y permisos` puedes:
+
+- ver quien tiene acceso,
+- asignar administradores,
+- y asignar editores.
+
+Roles actuales:
 
 - `Administrador`
 - `Editor`
 
-## 16. Revisar el historial de la base
+## 15. Cambiar nombre o eliminar una base
 
-1. Entra en la base.
-2. Ve a `Historial`.
-3. Revisa la tabla de movimientos.
-4. Si quieres mas contexto, haz clic en `Ver detalle`.
+En `Gestion > Zona sensible` puedes:
 
-Que puedes encontrar ahi:
+- cambiar el nombre de la base,
+- o ir al flujo de eliminacion segura.
 
-- registros agregados,
-- registros editados,
-- registros duplicados,
-- registros eliminados,
-- cambios en estructura,
-- importaciones,
-- exportaciones,
-- y cambios de permisos.
+## 16. Revisar el historial
 
-## 17. Resumen final
+En `Historial` puedes ver:
 
-Con EasierDataBases puedes:
+- que accion se hizo,
+- quien la hizo,
+- cuando ocurrio,
+- y el detalle del cambio.
 
-- crear una base sin programar,
-- personalizar sus campos,
-- elegir que columna representa al registro,
-- cargar, duplicar, buscar y ordenar registros,
-- filtrar por tipo de dato,
-- relacionar informacion,
-- buscar dentro de relaciones por ID o texto,
-- crear registros relacionados sin salir del flujo,
-- analizar tu base con estadisticas,
-- revisar el historial de movimientos,
-- importar y exportar CSV,
-- y trabajar con otras personas usando roles basicos.
+Si haces clic en el detalle, se abre una tarjeta con mas informacion.
+
+En cambios de registros, puede verse el `antes / ahora`.
+
+## 17. Modo oscuro y modo claro
+
+La app tiene selector de tema en la barra superior.
+
+El cambio:
+
+- afecta toda la interfaz,
+- se guarda,
+- y se mantiene al navegar.

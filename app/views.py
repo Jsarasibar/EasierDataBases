@@ -201,6 +201,31 @@ def _serialize_value_for_history(database, field_key, value):
     return str(value)
 
 
+def _record_description_preview_payload(record, fields, description_field, database):
+    rows = []
+    for field in fields:
+        raw_value = record.data.get(field.key, "")
+        if field == description_field:
+            continue
+        rows.append(
+            {
+                "label": field.label,
+                "value": _serialize_value_for_history(database, field.key, raw_value),
+            }
+        )
+    if database.has_priority:
+        rows.insert(0, {"label": "Prioridad", "value": record.get_priority_display()})
+    return {
+        "record_title": record.title,
+        "database_name": database.name,
+        "field_label": description_field.label,
+        "description": str(record.data.get(description_field.key, "")).strip(),
+        "rows": rows,
+        "detail_url": reverse("record_detail", args=[database.slug, record.pk]),
+        "edit_url": reverse("record_edit", args=[database.slug, record.pk]),
+    }
+
+
 def _record_changes_for_history(database, previous_data, new_data):
     changes = []
     for field in database.fields.all():
@@ -1198,6 +1223,7 @@ def _records_queryset(database, *, include_archived=False):
 def _field_supports_table_sort(field):
     return field.field_type in {
         CustomField.FieldType.TEXT,
+        CustomField.FieldType.DESCRIPTION,
         CustomField.FieldType.NUMBER,
         CustomField.FieldType.CURRENCY,
         CustomField.FieldType.DATE,
@@ -1743,8 +1769,10 @@ def database_detail(request, slug):
     high_priority_count = active_records_queryset.filter(priority=Record.Priority.HIGH).count() if database.has_priority else 0
     urgent_count = active_records_queryset.filter(priority=Record.Priority.URGENT).count() if database.has_priority else 0
     relation_fields = database.fields.filter(field_type=CustomField.FieldType.RELATION).select_related("relation_database")
+    description_fields = [field for field in database.fields.all() if field.field_type == CustomField.FieldType.DESCRIPTION]
     select_fields = database.fields.filter(field_type=CustomField.FieldType.SELECT)
     relation_previews = {}
+    description_previews = {}
     accessible_database_ids = set(_accessible_databases_for_user(request.user).values_list("pk", flat=True))
     for record in page_obj.object_list:
         for field in relation_fields:
@@ -1763,6 +1791,17 @@ def database_detail(request, slug):
                     "fields": [{"label": "Estado", "value": relation_error}],
                 }
     ordered_fields = list(database.fields.all())
+    for record in page_obj.object_list:
+        for field in description_fields:
+            raw_value = str(record.data.get(field.key, "") or "").strip()
+            if not raw_value:
+                continue
+            description_previews[f"{record.pk}:{field.key}"] = _record_description_preview_payload(
+                record,
+                ordered_fields,
+                field,
+                database,
+            )
     field_cards = [
         {
             "field": field,
@@ -1937,6 +1976,7 @@ def database_detail(request, slug):
         "field_cards": field_cards,
         "relation_fields": relation_fields,
         "relation_previews": relation_previews,
+        "description_previews": description_previews,
         "select_fields": select_fields,
         "records": page_obj.object_list,
         "page_obj": page_obj,

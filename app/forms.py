@@ -377,6 +377,8 @@ class RecordForm(forms.Form):
             "required": custom_field.required,
             "help_text": custom_field.help_text,
         }
+        if custom_field.field_type == CustomField.FieldType.DESCRIPTION:
+            return forms.CharField(widget=forms.Textarea(attrs={"rows": 5}), **common)
         if custom_field.field_type == CustomField.FieldType.NUMBER:
             return forms.DecimalField(decimal_places=2, **common)
         if custom_field.field_type == CustomField.FieldType.CURRENCY:

@@ -667,6 +667,16 @@
                                                             {% endif %}
                                                         {% endwith %}
                                                     {% endwith %}
+                                                {% elif field.field_type == 'description' %}
+                                                    {% with preview_key=record|relation_preview_key:field %}
+                                                        {% with preview=description_previews|get_item:preview_key %}
+                                                            {% if preview %}
+                                                                <button type="button" class="relation-chip description-chip" data-description-preview-key="{{ preview_key }}">Leer descripcion</button>
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        {% endwith %}
+                                                    {% endwith %}
                                                 {% else %}
                                                     {{ record|display_value:field|default:"-" }}
                                                 {% endif %}
@@ -766,6 +776,16 @@
                                                                 <button type="button" class="relation-chip" data-relation-preview-key="{{ preview_key }}">{{ record|display_value:field }}</button>
                                                             {% else %}
                                                                 {{ record|display_value:field }}
+                                                            {% endif %}
+                                                        {% endwith %}
+                                                    {% endwith %}
+                                                {% elif field.field_type == 'description' %}
+                                                    {% with preview_key=record|relation_preview_key:field %}
+                                                        {% with preview=description_previews|get_item:preview_key %}
+                                                            {% if preview %}
+                                                                <button type="button" class="relation-chip description-chip" data-description-preview-key="{{ preview_key }}">Leer descripcion</button>
+                                                            {% else %}
+                                                                -
                                                             {% endif %}
                                                         {% endwith %}
                                                     {% endwith %}
@@ -1105,6 +1125,93 @@
 
             document.querySelectorAll("[data-related-preview-close]").forEach((item) => {
                 item.addEventListener("click", closePreview);
+            });
+        })();
+    </script>
+    <div class="related-preview-card" id="description-preview-card" hidden>
+        <div class="related-preview-backdrop" data-description-preview-close></div>
+        <div class="related-preview-panel description-preview-panel">
+            <div class="member-row">
+                <div>
+                    <span class="eyebrow" id="description-preview-db">Descripcion</span>
+                    <h3 id="description-preview-title">Detalle del registro</h3>
+                </div>
+                <button type="button" class="modal-close-button" aria-label="Cerrar" data-description-preview-close>X</button>
+            </div>
+            <div class="record-meta description-preview-fields" id="description-preview-fields"></div>
+            <div class="description-preview-body top-gap">
+                <span class="eyebrow" id="description-preview-label">Descripcion</span>
+                <div class="description-preview-text" id="description-preview-text"></div>
+            </div>
+            <div class="hero-actions top-gap" id="description-preview-actions">
+                <a class="button subtle" id="description-preview-open" href="#">Abrir registro</a>
+                <a class="button subtle" id="description-preview-edit" href="#">Editar</a>
+            </div>
+        </div>
+    </div>
+    {{ description_previews|json_script:"description-previews-data" }}
+    <script>
+        (() => {
+            const previewsNode = document.getElementById("description-previews-data");
+            const descriptionPreviews = previewsNode ? JSON.parse(previewsNode.textContent) : {};
+            const descriptionButtons = Array.from(document.querySelectorAll("[data-description-preview-key]"));
+            const previewCard = document.getElementById("description-preview-card");
+            if (!descriptionButtons.length || !previewCard) {
+                return;
+            }
+            const previewDb = document.getElementById("description-preview-db");
+            const previewTitle = document.getElementById("description-preview-title");
+            const previewFields = document.getElementById("description-preview-fields");
+            const previewLabel = document.getElementById("description-preview-label");
+            const previewText = document.getElementById("description-preview-text");
+            const previewOpen = document.getElementById("description-preview-open");
+            const previewEdit = document.getElementById("description-preview-edit");
+
+            const closePreview = () => {
+                previewCard.hidden = true;
+            };
+
+            descriptionButtons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    const payload = descriptionPreviews[button.dataset.descriptionPreviewKey];
+                    if (!payload) {
+                        return;
+                    }
+                    previewDb.textContent = payload.database_name || "Descripcion";
+                    previewTitle.textContent = payload.record_title || "Detalle del registro";
+                    previewLabel.textContent = payload.field_label || "Descripcion";
+                    previewText.textContent = payload.description || "-";
+                    previewFields.innerHTML = "";
+                    (payload.rows || []).forEach((item) => {
+                        const row = document.createElement("div");
+                        row.className = "record-meta-row";
+                        row.innerHTML = `<span>${item.label}</span><strong>${item.value}</strong>`;
+                        previewFields.appendChild(row);
+                    });
+                    if (payload.detail_url) {
+                        previewOpen.href = payload.detail_url;
+                        previewOpen.hidden = false;
+                    } else {
+                        previewOpen.hidden = true;
+                    }
+                    if (payload.edit_url) {
+                        previewEdit.href = payload.edit_url;
+                        previewEdit.hidden = false;
+                    } else {
+                        previewEdit.hidden = true;
+                    }
+                    previewCard.hidden = false;
+                });
+            });
+
+            document.querySelectorAll("[data-description-preview-close]").forEach((item) => {
+                item.addEventListener("click", closePreview);
+            });
+
+            document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape" && !previewCard.hidden) {
+                    closePreview();
+                }
             });
         })();
     </script>

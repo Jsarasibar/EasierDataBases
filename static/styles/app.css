@@ -1963,6 +1963,10 @@ body.modal-open {
     text-decoration-style: dotted;
 }
 
+.description-chip {
+    white-space: nowrap;
+}
+
 .related-preview-card[hidden] {
     display: none;
 }
@@ -1990,6 +1994,35 @@ body.modal-open {
     border-radius: var(--radius-card);
     background: linear-gradient(180deg, #fbfdff 0%, #e8eef5 100%);
     box-shadow: 0 24px 48px rgba(12, 25, 40, 0.28);
+}
+
+.description-preview-panel {
+    width: min(720px, calc(100% - 32px));
+}
+
+.description-preview-fields .record-meta-row {
+    align-items: flex-start;
+}
+
+.description-preview-fields .record-meta-row strong {
+    max-width: 60%;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.description-preview-body {
+    padding: 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-card);
+    background: linear-gradient(180deg, #f7fbff 0%, #e7eef5 100%);
+    display: grid;
+    gap: 12px;
+}
+
+.description-preview-text {
+    white-space: pre-wrap;
+    line-height: 1.6;
+    color: var(--text);
 }
 
 .modal-close-button {
@@ -2664,6 +2697,7 @@ html[data-theme="dark"] .landing-card,
 html[data-theme="dark"] .landing-step,
 html[data-theme="dark"] .structure-primary-card,
 html[data-theme="dark"] .history-change-card,
+html[data-theme="dark"] .description-preview-body,
 html[data-theme="dark"] .related-preview-panel,
 html[data-theme="dark"] .related-modal-panel {
     background: linear-gradient(180deg, #162434 0%, #121e2c 100%);
