@@ -949,6 +949,17 @@ class DatabaseFlowTests(TestCase):
         self.assertContains(response, 'name="descripcion"', html=False)
         self.assertContains(response, "<textarea", html=False)
 
+    def test_creation_wizard_allows_manual_description_field_type(self):
+        self.client.login(username="admin", password="secret123")
+
+        response = self.client.get(
+            reverse("database_create"),
+            {"step": "3", "starter_template": "blank", "use_case": AppDatabase.UseCase.GENERIC},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<option value="description">Descripcion</option>', html=False)
+
     def test_database_tabs_render_specific_sections(self):
         self.client.login(username="admin", password="secret123")
         database = AppDatabase.objects.create(name="Operaciones", slug="operaciones", created_by=self.user)
